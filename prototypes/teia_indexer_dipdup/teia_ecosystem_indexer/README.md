@@ -56,3 +56,34 @@ make update
 ```
 
 Run `make all` to run full CI check or `make help` to see other available commands.
+
+---
+
+## Operator runbook (short) 🔧
+
+When you're running or triaging the indexer, use these quick steps:
+
+- Start (dev): `dipdup run` or `uv run teia_indexer.py`
+- Start (sqlite): `dipdup -C sqlite run` (set `SQLITE_PATH`)
+- Restart after code changes: stop process, `dipdup init` (if schema changed), then `dipdup run`
+
+### Quick health checks
+- Index sync progress is visible in logs (look for `synchronizing` → `synced`).
+- Confirm handler activity via logs (`SAVED SWAP`, `EDGE CREATED`, etc.).
+- Run project helper: `uv run check_indexer_progress.py` (returns 0 on basic health).
+
+### Known gotchas (and how we fixed them)
+- Big-map diffs sometimes arrive as plain `dict` (RPC) instead of DipDup model objects — handlers now accept both shapes.
+- Some entrypoint parameter types are wrapped/pydantic objects; normalize before passing to ORM (we added `swap_id` normalization).
+
+### Useful commands
+- Show recent swaps (sqlite):
+  - `sqlite3 teia_trust.sqlite3 "SELECT * FROM swap ORDER BY timestamp DESC LIMIT 10;"`
+- Show DipDup reports for recent crashes:
+  - `dipdup report show <report_id>`
+
+---
+
+If you'd like, I can:
+- add handler-level unit tests that assert both `dict` and `object` parameter/diff shapes are handled; or
+- centralize the normalization helpers and open a PR with tests.
