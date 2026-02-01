@@ -3,46 +3,108 @@ package: teia_ecosystem_indexer
 
 database:
   kind: sqlite
-  path: teia_trust.sqlite3
-
-contracts:
-  hen_v2:
-    address: KT1HbQepzV1nVGg8QVznG7z4RcHseD5kwqBn
-    typename: hen_v2
-  teia_market:
-    address: KT1PHubm9HtyQEJ4BBpMTVomq6mhbfNZ9z5w
-    typename: teia_market
+  path: teia_ecosystem.sqlite3
 
 datasources:
   tzkt:
     kind: tezos.tzkt
     url: https://api.tzkt.io
+    http:
+      connection_timeout: 30
+      retry_count: 5
+  
+  ipfs:
+    kind: ipfs
+    url: https://ipfs.io/ipfs
+
+contracts:
+  # The FA2 Token Registry (OBJKTs)
+  hen_objkts:
+    address: KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton
+    typename: hen_objkts
+
+  # V1 Minter & Market (Genesis)
+  hen_minter_v1:
+    address: KT1Hkg5qeNhfwpKW4fXvq7HGZB9z2EnmCCA9
+    typename: hen_minter_v1
+
+  # V2 Marketplace
+  hen_market_v2:
+    address: KT1HbQepzV1nVGg8QVznG7z4RcHseD5kwqBn
+    typename: hen_market_v2
+
+  # Teia Community Marketplace
+  teia_market:
+    address: KT1PHubm9HtyQEJ4BBpMTVomq6mhbfNZ9z5w
+    typename: teia_market
 
 indexes:
-  trust_sync:
+  # 1. Token Indexing (Mints)
+  token_index:
     kind: tezos.operations
-    datasources:
+    datasources: 
       - tzkt
     contracts:
-      - hen_v2
+      - hen_objkts
+    handlers:
+      - callback: on_mint
+        pattern:
+          - destination: hen_objkts
+            entrypoint: mint
+
+  # 2. V1 Market Indexing
+  market_v1_index:
+    kind: tezos.operations
+    datasources: 
+      - tzkt
+    contracts:
+      - hen_minter_v1
+    handlers:
+      - callback: on_swap_v1
+        pattern:
+          - destination: hen_minter_v1
+            entrypoint: swap
+      - callback: on_collect_v1
+        pattern:
+          - destination: hen_minter_v1
+            entrypoint: collect
+
+  # 3. V2 Market Indexing
+  market_v2_index:
+    kind: tezos.operations
+    datasources: 
+      - tzkt
+    contracts:
+      - hen_market_v2
+    handlers:
+      - callback: on_swap_v2
+        pattern:
+          - destination: hen_market_v2
+            entrypoint: swap
+      - callback: on_collect_v2
+        pattern:
+          - destination: hen_market_v2
+            entrypoint: collect
+
+  # 4. Teia Market Indexing
+  market_teia_index:
+    kind: tezos.operations
+    datasources: 
+      - tzkt
+    contracts:
       - teia_market
     handlers:
-      # Handle Swaps (Listings)
-      - callback: on_swap
-        pattern:
-          - destination: hen_v2
-            entrypoint: swap
-      - callback: on_swap
+      - callback: on_swap_teia
         pattern:
           - destination: teia_market
             entrypoint: swap
+      - callback: on_collect_teia
+        pattern:
+          - destination: teia_market
+            entrypoint: collect
 
-      # Handle Collects (Sales)
-      - callback: on_collect
-        pattern:
-          - destination: hen_v2
-            entrypoint: collect
-      - callback: on_collect
-        pattern:
-          - destination: teia_market
-            entrypoint: collect
+# Hook to fetch IPFS metadata asynchronously
+hooks:
+  fetch_metadata:
+    callback: fetch_metadata
+    atomic: False
