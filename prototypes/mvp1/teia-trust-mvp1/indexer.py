@@ -2,7 +2,7 @@
 import httpx
 import asyncio
 import json
-import time
+from datetime import datetime
 from database import init_db, get_db
 
 # Contract Addresses
@@ -11,7 +11,7 @@ TEIA_MARKET = "KT1PHubm9HtyQEJ4BBpMTVomq6mhbfNZ9z5w"
 TARGETS = [HEN_V2, TEIA_MARKET]
 
 # Settings
-BATCH_SIZE = 50       # How many collects to fetch per loop
+BATCH_SIZE = 100       # How many collects to fetch per loop
 RATE_LIMIT_DELAY = 1.0 # Seconds to sleep between loops (Be nice to TzKT)
 
 async def get_starting_cursor(client):
@@ -54,17 +54,16 @@ async def save_cursor(last_id):
     )
 
 async def sync_forward():
-    print(f"📡 Starting Forward Sync Daemon...")
+    print(f"📡 Starting Forward Sync...")
     
     async with httpx.AsyncClient(timeout=30.0) as client:
-        
         # 1. Initialize Cursor
         cursor_id = await get_starting_cursor(client)
+        start_time = datetime.now()
+        total_synced = 0
         
         while True:
             try:
-                # --- STEP 1: Fetch Next Batch of Intents ---
-                # We use id.gt (Greater Than) to move forward in time
                 r_collects = await client.get(
                     "https://api.tzkt.io/v1/operations/transactions",
                     params={
@@ -72,23 +71,28 @@ async def sync_forward():
                         "entrypoint": "collect",
                         "status": "applied",
                         "limit": BATCH_SIZE,
-                        "sort.asc": "id",       # Critical: Oldest to Newest
-                        "id.gt": cursor_id,     # Get items NEWER than cursor
+                        "sort.asc": "id",
+                        "id.gt": cursor_id,
                         "select": "hash,sender,timestamp,id" 
                     }
                 )
                 
                 if r_collects.status_code != 200:
-                    print(f"⚠️ API Error {r_collects.status_code}. Retrying in 5s...")
+                    print(f"⚠️ API Error {r_collects.status_code}. Sleeping...")
                     await asyncio.sleep(5)
                     continue
                 
                 collects = r_collects.json()
-                
                 if not collects:
                     print("💤 caught up to tip. Sleeping 10s...")
                     await asyncio.sleep(10)
                     continue
+                
+                # --- Status Prep ---
+                current_batch_time = collects[-1]["timestamp"]
+                # Convert TzKT timestamp (e.g., 2021-03-01T...) to pretty format
+                dt_obj = datetime.strptime(current_batch_time, "%Y-%m-%dT%H:%M:%SZ")
+                pretty_date = dt_obj.strftime("%b %d, %Y")
 
                 # --- STEP 2: Trace Execution (Get Internal Ops) ---
                 group_hashes = list(set([c["hash"] for c in collects]))
@@ -150,15 +154,15 @@ async def sync_forward():
                             except:
                                 continue
 
-                # --- STEP 4: Update Cursor & Rate Limit ---
-                # The new cursor is the ID of the LAST item in the 'collects' batch
+                # --- STEP 4: Human-Readable Output ---
                 last_item_id = collects[-1]["id"]
                 await save_cursor(last_item_id)
                 cursor_id = last_item_id
+                total_synced += len(collects)
                 
-                print(f"✅ Synced {len(collects)} ops up to ID {cursor_id}. Found {trace_count} connections.")
-                
-                # Be polite
+                # Progress Bar / Status Line
+                print(f"📅 [{pretty_date}] | 📈 Total Ops: {total_synced} | ✨ New Edges: +{trace_count} | ID: {cursor_id}")
+    
                 await asyncio.sleep(RATE_LIMIT_DELAY)
 
             except Exception as e:
