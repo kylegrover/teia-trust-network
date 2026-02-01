@@ -1,0 +1,48 @@
+spec_version: 3.0
+package: teia_ecosystem_indexer
+
+database:
+  kind: sqlite
+  path: teia_trust.sqlite3
+
+contracts:
+  hen_v2:
+    address: KT1HbQepzV1nVGg8QVznG7z4RcHseD5kwqBn
+    typename: hen_v2
+  teia_market:
+    address: KT1PHubm9HtyQEJ4BBpMTVomq6mhbfNZ9z5w
+    typename: teia_market
+
+datasources:
+  tzkt:
+    kind: tezos.tzkt
+    url: https://api.tzkt.io
+
+indexes:
+  trust_sync:
+    kind: tezos.operations
+    datasources:
+      - tzkt
+    contracts:
+      - hen_v2
+      - teia_market
+    handlers:
+      # Handle Swaps (Listings)
+      - callback: on_swap
+        pattern:
+          - destination: hen_v2
+            entrypoint: swap
+      - callback: on_swap
+        pattern:
+          - destination: teia_market
+            entrypoint: swap
+
+      # Handle Collects (Sales)
+      - callback: on_collect
+        pattern:
+          - destination: hen_v2
+            entrypoint: collect
+      - callback: on_collect
+        pattern:
+          - destination: teia_market
+            entrypoint: collect
