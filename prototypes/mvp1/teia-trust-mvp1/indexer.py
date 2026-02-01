@@ -14,6 +14,79 @@ TARGETS = [HEN_V2, TEIA_MARKET]
 BATCH_SIZE = 100       # How many collects to fetch per loop
 RATE_LIMIT_DELAY = 1.0 # Seconds to sleep between loops (Be nice to TzKT)
 
+# --- helpers: retries + canonical creator resolution ---
+_canonical_creator_cache = {}
+
+def _normalize_addr_like(v):
+    """Return a normalized address string from common TzKT shapes (str, dict with address/value)."""
+    if v is None:
+        return None
+    if isinstance(v, str):
+        return v.strip()
+    if isinstance(v, dict):
+        return (v.get('address') or v.get('value') or v.get('tz') or v.get('string')) and str(
+            v.get('address') or v.get('value') or v.get('tz') or v.get('string')
+        ).strip()
+    return str(v).strip()
+
+async def get_with_retries(client, url, params=None, retries=3, backoff=1.0):
+    """Simple retry for transient 5xx / 429 responses."""
+    for attempt in range(1, retries + 1):
+        r = await client.get(url, params=params)
+        if r.status_code == 200:
+            return r
+        if r.status_code in (429, 502, 503, 504) and attempt < retries:
+            await asyncio.sleep(backoff * (2 ** (attempt - 1)))
+            continue
+        return r
+
+async def fetch_canonical_creator(client, contract_addr, token_id):
+    """Prefer authoritative on-chain minter/firstMinter from TzKT; fall back to token metadata.
+    Results are cached in-memory for the run.
+    """
+    key = (contract_addr, str(token_id))
+    if key in _canonical_creator_cache:
+        return _canonical_creator_cache[key]
+
+    try:
+        r = await get_with_retries(client, "https://api.tzkt.io/v1/tokens", params={
+            "contract": contract_addr,
+            "tokenId": token_id,
+            "select": "metadata,firstMinter"
+        })
+        if r.status_code == 200:
+            items = r.json()
+            if items:
+                token = items[0]
+
+                # firstMinter may be a string or an object; normalize safely
+                fm_raw = token.get("firstMinter") or token.get("first_minter")
+                fm = _normalize_addr_like(fm_raw)
+                if fm:
+                    _canonical_creator_cache[key] = fm
+                    return fm
+
+                # metadata.creators entries are sometimes objects
+                md = token.get("metadata") or {}
+                creators = md.get("creators")
+                if isinstance(creators, list) and creators:
+                    candidate = creators[0]
+                    cand_addr = _normalize_addr_like(candidate)
+                    if cand_addr:
+                        _canonical_creator_cache[key] = cand_addr
+                        return cand_addr
+
+                issuer = md.get("issuer")
+                issuer_addr = _normalize_addr_like(issuer)
+                if issuer_addr:
+                    _canonical_creator_cache[key] = issuer_addr
+                    return issuer_addr
+    except Exception as e:
+        print(f"⚠️ canonical-creator lookup failed for {contract_addr}/{token_id}: {e}")
+
+    _canonical_creator_cache[key] = None
+    return None
+
 async def get_starting_cursor(client):
     """
     Determines where to start indexing.
@@ -114,33 +187,43 @@ async def sync_forward():
                 # --- STEP 3: Fetch Resulting Transfers ---
                 trace_count = 0
                 if valid_op_ids:
-                    # Batch fetch transfers
-                    t_response = await client.get(
+                    # Batch fetch transfers (with retries)
+                    t_response = await get_with_retries(client,
                         "https://api.tzkt.io/v1/tokens/transfers",
                         params={
                             "transactionId.in": ",".join(map(str, valid_op_ids)),
                             "select": "to,token,transactionId,timestamp"
                         }
                     )
-                    
+
                     if t_response.status_code == 200:
                         transfers = t_response.json()
                         db = get_db() # Get thread-safe connection
-                        
+
                         for tx in transfers:
                             try:
                                 buyer = tx.get("to", {}).get("address")
                                 token = tx.get("token", {})
                                 metadata = token.get("metadata", {})
-                                
-                                # Resolve Artist
-                                creators = metadata.get("creators")
-                                if isinstance(creators, list) and len(creators) > 0:
-                                    artist = creators[0]
-                                else:
-                                    artist = metadata.get("issuer")
-                                
-                                if artist: artist = artist.strip()
+
+                                # Resolve Artist (prefer on-chain canonical minter)
+                                artist = None
+                                token_contract = token.get("contract", {}).get("address")
+                                token_id = token.get("tokenId") or token.get("token_id")
+                                if token_contract and token_id is not None:
+                                    artist = await fetch_canonical_creator(client, token_contract, token_id)
+
+                                # fallback to embedded metadata (handle dict/list shapes safely)
+                                if not artist:
+                                    creators = metadata.get("creators")
+                                    if isinstance(creators, list) and len(creators) > 0:
+                                        artist = _normalize_addr_like(creators[0])
+                                    else:
+                                        artist = _normalize_addr_like(metadata.get("issuer"))
+
+                                # ensure artist is a trimmed string or None
+                                if artist:
+                                    artist = str(artist).strip()
 
                                 if buyer and artist and buyer != artist:
                                     db["edges"].insert({
@@ -151,7 +234,8 @@ async def sync_forward():
                                         "timestamp": tx.get("timestamp")
                                     }, pk=("source", "target", "token_id"), replace=True)
                                     trace_count += 1
-                            except:
+                            except Exception as e:
+                                print(f"⚠️ parse error (transfer) tx={tx.get('transactionId')} err={e}")
                                 continue
 
                 # --- STEP 4: Human-Readable Output ---

@@ -62,6 +62,7 @@ def init_db():
         buyer TEXT,
         amount INTEGER,
         price_mutez INTEGER,
+        swap_id INTEGER,
         PRIMARY KEY (op_id)
     )""")
 
@@ -72,6 +73,18 @@ def init_db():
     )""")
     
     conn.commit()
+
+    # Backfill/ensure `swap_id` exists for older DBs
+    try:
+        cur = conn.cursor()
+        cols = [r[1] for r in cur.execute("PRAGMA table_info(events)").fetchall()]
+        if 'swap_id' not in cols:
+            cur.execute("ALTER TABLE events ADD COLUMN swap_id INTEGER")
+            conn.commit()
+    except Exception:
+        # best-effort; existing DBs will continue to work
+        pass
+
     return conn
 
 # --- HELPERS ---
@@ -257,13 +270,15 @@ async def sync_market_history(client: httpx.AsyncClient, conn: sqlite3.Connectio
             logger.info("💤 History fully synced.")
             break
             
+        # lightweight swap_id cache to resolve V1 collects
+        swap_cache = {}
         events = []
         for op in ops:
             try:
                 entry = op['parameter']['entrypoint']
                 val = op['parameter']['value']
                 contract_addr = op['target']['address']
-                
+
                 # Identify Market Version
                 version = "UNKNOWN"
                 for k, v in MARKETS.items():
@@ -271,50 +286,81 @@ async def sync_market_history(client: httpx.AsyncClient, conn: sqlite3.Connectio
 
                 # PARSE EVENT
                 if entry == "collect":
-                    # V1/V2/Teia collect params are usually { objkt_id: ..., ... }
-                    # Note: Parameter structures vary slightly by contract version.
-                    # This logic assumes standard Teia/HEN structure.
-                    objkt_id = val.get('objkt_id', val.get('objkt_amount')) # Field names vary
-                    if not objkt_id and isinstance(val, int): objkt_id = val # Sometimes it's just an int
-                    
-                    # If we can't find ID in param, try diff structure (older V1)
-                    if not objkt_id and 'swap_id' in val:
-                         # Requires a join with swap table to get Token ID. 
-                         # For MVP, we skip complex V1 swap lookups.
-                         continue 
+                    objkt_id = val.get('objkt_id', val.get('objkt_amount'))
+                    if not objkt_id and isinstance(val, int):
+                        objkt_id = val
 
+                    # V1 path: resolve via swap_id -> cache, DB, then TzKT
+                    swap_id = val.get('swap_id')
+                    if not objkt_id and swap_id is not None:
+                        objkt_id = swap_cache.get(swap_id)
+                        if not objkt_id:
+                            row = c.execute("SELECT token_id FROM events WHERE type='LIST' AND swap_id=? ORDER BY op_id DESC LIMIT 1", (swap_id,)).fetchone()
+                            if row:
+                                objkt_id = row[0]
+                            else:
+                                # fallback: look up recent swap ops near this collect
+                                try:
+                                    r_swap = await client.get("https://api.tzkt.io/v1/operations/transactions", params={
+                                        "target": contract_addr,
+                                        "entrypoint": "swap",
+                                        "status": "applied",
+                                        "limit": 50,
+                                        "sort.desc": "id",
+                                        "id.lt": op['id']
+                                    })
+                                    if r_swap.status_code == 200:
+                                        for sop in r_swap.json():
+                                            sval = sop.get('parameter', {}).get('value', {})
+                                            if sval and sval.get('swap_id') == swap_id:
+                                                objkt_id = sval.get('objkt_id') or sval.get('objkt_amount')
+                                                break
+                                except Exception as e:
+                                    logger.warning(f"swap lookup failed for swap_id={swap_id}: {e}")
+
+                    if not objkt_id:
+                        logger.debug(f"could not resolve token for collect op {op.get('id')} (swap_id={swap_id})")
+                        continue
+
+                    seller = op['diffs'][0]['content']['address'] if 'diffs' in op else "Unknown"
                     events.append((
-                        op['hash'], op['id'], op['timestamp'], 
-                        "SALE", version, objkt_id, 
-                        op['diffs'][0]['content']['address'] if 'diffs' in op else "Unknown", # Seller (approx)
-                        op['sender']['address'], # Buyer
-                        1, op['amount'] # Price is usually the tx amount
+                        op['hash'], op['id'], op['timestamp'],
+                        "SALE", version, objkt_id,
+                        seller,
+                        op['sender']['address'],
+                        1, op['amount'], swap_id
                     ))
+
+                    if swap_id is not None:
+                        swap_cache[swap_id] = objkt_id
 
                 elif entry == "swap":
-                    # Listing
-                    objkt_id = val.get('objkt_id')
+                    objkt_id = val.get('objkt_id') or val.get('objkt_amount')
                     price = val.get('xtz_per_objkt')
-                    amount = val.get('objkt_amount')
-                    
+                    amount = val.get('objkt_amount') or val.get('amount')
+                    swap_id = val.get('swap_id')
+
                     events.append((
-                        op['hash'], op['id'], op['timestamp'], 
-                        "LIST", version, objkt_id, 
-                        op['sender']['address'], # Seller
-                        None, # No Buyer yet
-                        amount, price
+                        op['hash'], op['id'], op['timestamp'],
+                        "LIST", version, objkt_id,
+                        op['sender']['address'],
+                        None,
+                        amount, price, swap_id
                     ))
 
+                    if swap_id is not None:
+                        swap_cache[swap_id] = objkt_id
+
             except Exception as e:
-                # logger.warning(f"Parse error on {op['id']}: {e}")
-                pass
+                logger.warning(f"Parse error on {op.get('id')}: {e}")
+                continue
 
         if events:
             # Using 'INSERT OR IGNORE' to prevent duplicates if restarting
             conn.executemany("""
                 INSERT OR IGNORE INTO events 
-                (op_hash, op_id, timestamp, type, contract, token_id, seller, buyer, amount, price_mutez) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (op_hash, op_id, timestamp, type, contract, token_id, seller, buyer, amount, price_mutez, swap_id) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, events)
             
             # Update Cursor
