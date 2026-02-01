@@ -10,10 +10,18 @@ async def on_swap_v2(
     swap_id = None
     if transaction.data.diffs:
         for diff in transaction.data.diffs:
-            if diff.action == 'add_key':
-                swap_id = int(diff.key)
-                break
-    
+            # Support both dict-style diffs (RPC responses) and object-style diffs
+            # (DipDup may provide model objects). Be defensive like `on_swap`.
+            action = diff.get('action') if isinstance(diff, dict) else getattr(diff, 'action', None)
+            key = diff.get('key') if isinstance(diff, dict) else getattr(diff, 'key', None)
+
+            if action == 'add_key' or action == 'update':
+                try:
+                    swap_id = int(key)
+                    break
+                except Exception:
+                    continue
+
     if swap_id is None:
         return
 
