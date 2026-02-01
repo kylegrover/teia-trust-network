@@ -19,3 +19,16 @@ Watch the logs. It should say "Found X collect events" then "Mapped Y trust conn
 **3** Start API:
 
 `uv run uvicorn main:app --reload`
+
+
+Calculate Scores: Run the math engine. (You run this whenever you want to update reputations).
+Bash
+
+uv run trust_engine.py
+
+(You should see "🏆 Top Trust: tz1..." with the highest authority in your dataset).
+
+
+Visualize: Reload your viz.html.
+
+    New Feature: High-reputation nodes (the curators and popular artists) will now appear physically larger than random users. Hover over a node to see its calculated "Trust Score".

@@ -18,7 +18,16 @@ def init_db():
         }, pk=("source", "target", "token_id"))
         db["edges"].create_index(["source", "target"])
 
-    # 2. Indexer State (The Bookmark)
+    # 2. Global Trust Scores (NEW)
+    if "scores" not in db.table_names():
+        db["scores"].create({
+            "address": str,
+            "score": float, 
+            "rank": int
+        }, pk="address")
+        db["scores"].create_index(["score"]) # Fast sorting
+
+    # 3. Indexer State
     if "state" not in db.table_names():
         db["state"].create({
             "key": str,
