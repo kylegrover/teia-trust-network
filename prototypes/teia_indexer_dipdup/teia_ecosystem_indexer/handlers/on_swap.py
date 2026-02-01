@@ -1,8 +1,8 @@
 from dipdup.context import HandlerContext
-from dipdup.models.tezos import TezosTransaction  # <--- The correct import
-
+from dipdup.models.tezos import TezosTransaction
 from teia_ecosystem_indexer.types.hen_v2.tezos_parameters.swap import SwapParameter as HenSwap
 from teia_ecosystem_indexer.types.teia_market.tezos_parameters.swap import SwapParameter as TeiaSwap
+from teia_ecosystem_indexer import models
 
 async def on_swap(
     ctx: HandlerContext,
@@ -11,17 +11,39 @@ async def on_swap(
     seller = transaction.data.sender_address
     contract = transaction.data.target_address
     
-    token_id = None
-    price = None
+    # 1. Get Details from Params
+    token_id = transaction.parameter.objkt_id
+    price = transaction.parameter.xtz_per_objkt
     
-    # 1. Extract info (handling both contract types)
-    if hasattr(transaction.parameter, 'objkt_id'):
-        token_id = transaction.parameter.objkt_id
-        price = transaction.parameter.xtz_per_objkt
-    elif hasattr(transaction.parameter, 'objkt_amount'):
-        # Some older contracts used different names
-        token_id = transaction.parameter.objkt_amount
-        price = transaction.parameter.xtz_per_objkt
-        
-    # 2. Log it
-    print(f"🏷️  SWAP: {seller} listed Item {token_id} for {price} mutez on {contract}")
+    # 2. Find the Swap ID from the BigMap Diff
+    swap_id = None
+    
+    if transaction.data.diffs:
+        for diff in transaction.data.diffs:
+            # FIX: Check if it's a dict or an object to be safe
+            action = diff.get('action') if isinstance(diff, dict) else getattr(diff, 'action', None)
+            key = diff.get('key') if isinstance(diff, dict) else getattr(diff, 'key', None)
+            
+            if action == 'add_key' or action == 'update':
+                try:
+                    swap_id = int(key)
+                    break
+                except Exception:
+                    continue
+    
+    if swap_id is None:
+        # Warn but don't crash. Some swaps might not emit standard diffs.
+        # print(f"⚠️  SWAP WITHOUT ID: {seller} listed {token_id}")
+        return
+
+    # 3. Save to Database
+    await models.Swap.create(
+        swap_id=swap_id,
+        contract=contract,
+        seller_address=seller,
+        token_id=token_id,
+        price_mutez=price,
+        timestamp=transaction.data.timestamp
+    )
+    
+    print(f"🏷️  SAVED SWAP #{swap_id}: {seller} listed Item {token_id}")
