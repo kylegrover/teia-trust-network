@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teia Trust Graph</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        body { 
+            background: #0f172a; 
+            color: #f8fafc; 
+            font-family: monospace; 
+            margin: 0; 
+            overflow: hidden; /* Stop scrollbars */
+        }
+        
+        #controls { 
+            height: 60px;
+            padding: 10px 20px; 
+            background: #1e293b; 
+            border-bottom: 1px solid #334155; 
+            display: flex; 
+            gap: 10px; 
+            align-items: center;
+        }
+        
+        /* FORCE exact height to stop the layout loop */
+        #mynetwork { 
+            width: 100vw; 
+            height: calc(100vh - 81px); 
+            background: #0f172a;
+        }
+
+        input { background: #334155; border: 1px solid #475569; color: white; padding: 10px; min-width: 350px; border-radius: 4px; }
+        button { background: #2563eb; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-weight: bold;}
+        button:hover { background: #1d4ed8; }
+        
+        .legend { font-size: 0.8em; color: #94a3b8; margin-left: auto; }
+        span.dot { height: 10px; width: 10px; display: inline-block; border-radius: 50%; margin-right: 5px; }
+    </style>
+</head>
+<body>
+
+<div id="controls">
+    <label>Center:</label>
+    <input type="text" id="centerNode" placeholder="tz1..." value="">
+    <button onclick="drawGraph()">Visualize</button>
+    
+    <div class="legend">
+        <span class="dot" style="background:#eab308"></span>You
+        <span class="dot" style="background:#4ade80; margin-left:10px;"></span>Direct
+        <span class="dot" style="background:#64748b; margin-left:10px;"></span>Network
+    </div>
+</div>
+
+<div id="mynetwork"></div>
+
+<script type="text/javascript">
+    // Auto-fill from URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    if(urlParams.has('addr')) document.getElementById('centerNode').value = urlParams.get('addr');
+
+    async function drawGraph() {
+        const center = document.getElementById('centerNode').value.trim();
+        if(!center) return alert("Please enter a Tezos address");
+
+        try {
+            console.log(`Fetching graph for ${center}...`);
+            const res = await fetch(`http://127.0.0.1:8000/graph/${center}`);
+            const data = await res.json();
+            
+            console.log("Data received:", data);
+
+            if(!data.nodes || data.nodes.length === 0) {
+                alert("No connections found for this address! (Try adding more data)");
+                return;
+            }
+
+            const container = document.getElementById('mynetwork');
+            const graphData = {
+                nodes: new vis.DataSet(data.nodes),
+                edges: new vis.DataSet(data.edges)
+            };
+
+            const options = {
+                nodes: {
+                    shape: 'dot',
+                    font: { color: '#f8fafc', size: 14 }
+                },
+                edges: {
+                    width: 2,
+                    smooth: { type: 'continuous' }
+                },
+                physics: {
+                    stabilization: true, // Wait for graph to settle before showing
+                    barnesHut: {
+                        gravitationalConstant: -3000,
+                        springConstant: 0.04,
+                        springLength: 95
+                    }
+                },
+                layout: {
+                    randomSeed: 2
+                }
+            };
+
+            const network = new vis.Network(container, graphData, options);
+            
+            // Force camera to center after drawing
+            network.once("afterDrawing", function() {
+                network.fit({
+                    animation: { duration: 1000, easingFunction: 'easeInOutQuad' }
+                });
+            });
+
+        } catch (e) {
+            console.error(e);
+            alert("Error connecting to local API.");
+        }
+    }
+</script>
+
+</body>
+</html>
