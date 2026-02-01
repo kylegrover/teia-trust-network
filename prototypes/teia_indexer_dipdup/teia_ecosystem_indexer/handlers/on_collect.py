@@ -15,12 +15,34 @@ async def on_collect(
     amount = transaction.data.amount
     timestamp = transaction.data.timestamp
 
-    # 1. Resolve Swap ID
-    swap_id = None
-    if hasattr(transaction.parameter, 'root'):
-        swap_id = transaction.parameter.root
-    elif hasattr(transaction.parameter, 'swap_id'):
-        swap_id = transaction.parameter.swap_id
+    # 1. Resolve Swap ID robustly and ensure it's an int (or None)
+    def _normalize_swap_id(param) -> int | None:
+        if param is None:
+            return None
+        if isinstance(param, int):
+            return param
+        if isinstance(param, str):
+            try:
+                return int(param)
+            except Exception:
+                return None
+        if isinstance(param, dict):
+            for key in ('__root__', 'root', 'swap_id'):
+                if key in param:
+                    try:
+                        return int(param[key])
+                    except Exception:
+                        return None
+            return None
+        for attr in ('__root__', 'root', 'swap_id'):
+            if hasattr(param, attr):
+                try:
+                    return int(getattr(param, attr))
+                except Exception:
+                    return None
+        return None
+
+    swap_id = _normalize_swap_id(transaction.parameter)
 
     seller_address = 'Unknown'
     token_id = None
