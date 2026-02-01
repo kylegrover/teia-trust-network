@@ -1,0 +1,257 @@
+./schema_sniffer.py
+Starting Teia/HEN Schema Sniffer at 2026-02-01 09:30:24.436545
+
+============================================================
+ ANALYZING: HEN_V1_MARKET (KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton)
+============================================================
+🔍 Fetching Entrypoint Schemas...
+
+  [Entrypoint: mint]
+  Signature: {
+  "schema:object": {
+    "address:address": "address",
+    "amount:nat": "nat",
+    "token_id:nat": "nat",
+    "token_info:map_flat:string:bytes": {
+      "string": "bytes"
+    }
+  }
+}
+  👉 Fetching real examples for 'mint'...
+     Ex 1: {'amount': '1', 'address': 'tz1UBZUkXpKGhYsP5KtzDNqLLchwF4uHrGjw', 'token_id': '152', 'token_info': {'': '697066733a2f2f516d6131316b366168505258475656375267484e754c7577423950715142324d564a55744e4e584a376451654172'}}
+     Ex 2: {'amount': '2', 'address': 'tz1UBZUkXpKGhYsP5KtzDNqLLchwF4uHrGjw', 'token_id': '153', 'token_info': {'': '697066733a2f2f516d656171524255697734634a694e4b456357326e6f633765674c6435476742714c63484871556861754a41484e'}}
+
+📦 Fetching Storage Schema...
+{
+  "schema:object": {
+    "administrator:address": "address",
+    "all_tokens:nat": "nat",
+    "ledger:big_map:object:nat": [
+      {
+        "key:object": {
+          "address:address": "address",
+          "nat:nat": "nat"
+        },
+        "value:nat": "nat"
+      }
+    ],
+    "metadata:big_map_flat:string:bytes": {
+      "string": "bytes"
+    },
+    "operators:big_map:object:unit": [
+      {
+        "key:object": {
+          "owner:address": "address",
+          "operator:address": "address",
+          "token_id:nat": "nat"
+        },
+        "value:unit": "unit"
+      }
+    ],
+    "paused:bool": "bool",
+    "token_metadata:big_map_flat:nat:object": {
+      "nat": {
+        "token_id:nat": "nat",
+        "token_info:map_flat:string:bytes": {
+          "string": "bytes"
+        }
+      }
+    }
+  }
+}
+
+============================================================
+ ANALYZING: HEN_V2_MARKET (KT1HbQepzV1nVGg8QVznG7z4RcHseD5kwqBn)
+============================================================
+🔍 Fetching Entrypoint Schemas...
+
+  [Entrypoint: cancel_swap]
+  Signature: {
+  "schema:nat": "nat"
+}
+  👉 Fetching real examples for 'cancel_swap'...
+     Ex 1: 500000
+     Ex 2: 500014
+
+  [Entrypoint: collect]
+  Signature: {
+  "schema:nat": "nat"
+}
+  👉 Fetching real examples for 'collect'...
+     Ex 1: 500016
+     Ex 2: 500019
+
+  [Entrypoint: swap]
+  Signature: {
+  "schema:object": {
+    "creator:address": "address",
+    "objkt_amount:nat": "nat",
+    "objkt_id:nat": "nat",
+    "royalties:nat": "nat",
+    "xtz_per_objkt:mutez": "mutez"
+  }
+}
+  👉 Fetching real examples for 'swap'...
+     Ex 1: {'creator': 'tz1Y1j7FK1X9Rrv2VdPz5bXoU7SszF8W1RnK', 'objkt_id': '127648', 'royalties': '150', 'objkt_amount': '1', 'xtz_per_objkt': '15000000'}
+     Ex 2: {'creator': 'tz1Y1j7FK1X9Rrv2VdPz5bXoU7SszF8W1RnK', 'objkt_id': '127648', 'royalties': '150', 'objkt_amount': '1', 'xtz_per_objkt': '5000000'}
+
+📦 Fetching Storage Schema...
+{
+  "schema:object": {
+    "counter:nat": "nat",
+    "fee:nat": "nat",
+    "manager:address": "address",
+    "metadata:big_map_flat:string:bytes": {
+      "string": "bytes"
+    },
+    "objkt:address": "address",
+    "swaps:big_map_flat:nat:object": {
+      "nat": {
+        "creator:address": "address",
+        "issuer:address": "address",
+        "objkt_amount:nat": "nat",
+        "objkt_id:nat": "nat",
+        "royalties:nat": "nat",
+        "xtz_per_objkt:mutez": "mutez"
+      }
+    }
+  }
+}
+
+============================================================
+ ANALYZING: TEIA_MARKET (KT1PHubm9HtyQEJ4BBpMTVomq6mhbfNZ9z5w)
+============================================================
+🔍 Fetching Entrypoint Schemas...
+
+  [Entrypoint: cancel_swap]
+  Signature: {
+  "schema:nat": "nat"
+}
+  👉 Fetching real examples for 'cancel_swap'...
+     Ex 1: 0
+     Ex 2: 2
+
+  [Entrypoint: collect]
+  Signature: {
+  "schema:nat": "nat"
+}
+  👉 Fetching real examples for 'collect'...
+     Ex 1: 0
+     Ex 2: 0
+
+  [Entrypoint: swap]
+  Signature: {
+  "schema:object": {
+    "fa2:address": "address",
+    "objkt_id:nat": "nat",
+    "objkt_amount:nat": "nat",
+    "xtz_per_objkt:mutez": "mutez",
+    "royalties:nat": "nat",
+    "creator:address": "address"
+  }
+}
+  👉 Fetching real examples for 'swap'...
+     Ex 1: {'fa2': 'KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton', 'creator': 'tz1g6JRCpsEnD2BLiAzPNK3GBD1fKicV9rCx', 'objkt_id': '531011', 'royalties': '200', 'objkt_amount': '20', 'xtz_per_objkt': '100000'}
+     Ex 2: {'fa2': 'KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton', 'creator': 'tz1g6JRCpsEnD2BLiAzPNK3GBD1fKicV9rCx', 'objkt_id': '531011', 'royalties': '200', 'objkt_amount': '10', 'xtz_per_objkt': '200000'}
+
+📦 Fetching Storage Schema...
+{
+  "schema:object": {
+    "allowed_fa2s:big_map_flat:address:unit": {
+      "address": "unit"
+    },
+    "collects_paused:bool": "bool",
+    "counter:nat": "nat",
+    "fee:nat": "nat",
+    "fee_recipient:address": "address",
+    "manager:address": "address",
+    "metadata:big_map_flat:string:bytes": {
+      "string": "bytes"
+    },
+    "proposed_manager:?address": "address",
+    "swaps:big_map_flat:nat:object": {
+      "nat": {
+        "issuer:address": "address",
+        "fa2:address": "address",
+        "objkt_id:nat": "nat",
+        "objkt_amount:nat": "nat",
+        "xtz_per_objkt:mutez": "mutez",
+        "royalties:nat": "nat",
+        "creator:address": "address"
+      }
+    },
+    "swaps_paused:bool": "bool"
+  }
+}
+
+============================================================
+ ANALYZING: OBJKT_MINTER (KT1Hkg5qeNhfwpKW4fXvq7HGZB9z2EnmCCA9)
+============================================================
+🔍 Fetching Entrypoint Schemas...
+
+  [Entrypoint: cancel_swap]
+  Signature: {
+  "schema:nat": "nat"
+}
+  👉 Fetching real examples for 'cancel_swap'...
+     Ex 1: 195
+     Ex 2: 341
+
+  [Entrypoint: collect]
+  Signature: {
+  "schema:object": {
+    "objkt_amount:nat": "nat",
+    "swap_id:nat": "nat"
+  }
+}
+  👉 Fetching real examples for 'collect'...
+     Ex 1: {'swap_id': '0', 'objkt_amount': '1'}
+     Ex 2: {'swap_id': '1', 'objkt_amount': '1'}
+
+  [Entrypoint: swap]
+  Signature: {
+  "schema:object": {
+    "objkt_amount:nat": "nat",
+    "objkt_id:nat": "nat",
+    "xtz_per_objkt:mutez": "mutez"
+  }
+}
+  👉 Fetching real examples for 'swap'...
+     Ex 1: {'objkt_id': '154', 'objkt_amount': '1', 'xtz_per_objkt': '0'}
+     Ex 2: {'objkt_id': '158', 'objkt_amount': '10', 'xtz_per_objkt': '1000000'}
+
+📦 Fetching Storage Schema...
+{
+  "schema:object": {
+    "curate:address": "address",
+    "genesis:timestamp": "timestamp",
+    "hdao:address": "address",
+    "locked:bool": "bool",
+    "manager:address": "address",
+    "metadata:big_map_flat:string:bytes": {
+      "string": "bytes"
+    },
+    "objkt:address": "address",
+    "objkt_id:nat": "nat",
+    "royalties:big_map_flat:nat:object": {
+      "nat": {
+        "issuer:address": "address",
+        "royalties:nat": "nat"
+      }
+    },
+    "size:int": "int",
+    "swap_id:nat": "nat",
+    "swaps:big_map_flat:nat:object": {
+      "nat": {
+        "issuer:address": "address",
+        "objkt_amount:nat": "nat",
+        "objkt_id:nat": "nat",
+        "xtz_per_objkt:mutez": "mutez"
+      }
+    }
+  }
+}
+
+============================================================
+ DONE
+============================================================
