@@ -24,9 +24,20 @@ async def fetch_metadata(ctx: HookContext) -> None:
                 async with session.get(url, timeout=5) as response:
                     if response.status == 200:
                         data = await response.json()
-                        token.metadata = data
+                        
+                        # Populate the sidecar table instead of the Token table
+                        await models.TokenMetadata.update_or_create(
+                            token=token,
+                            defaults={
+                                'content': data,
+                                'name': data.get('name'),
+                                'description': data.get('description'),
+                                'display_uri': data.get('displayUri') or data.get('artifactUri')
+                            }
+                        )
+
                         token.metadata_synced = True
                         await token.save()
-                        ctx.logger.info('Fetched metadata for Token %s', token.token_id)
+                        ctx.logger.info('Fetched and interned metadata for Token %s', token.token_id)
             except Exception as e:
                 ctx.logger.warning('Failed to fetch IPFS for token %s: %s', token.token_id, e)

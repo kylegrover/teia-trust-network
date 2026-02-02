@@ -20,6 +20,7 @@ async def on_mint(
         contract=transaction.data.target_address,
         token_id=transaction.parameter.token_id,
         creator=creator_holder,
+        creator_address=transaction.parameter.address,
         supply=transaction.parameter.amount,
         metadata_uri=metadata_uri,
         metadata_synced=False,
