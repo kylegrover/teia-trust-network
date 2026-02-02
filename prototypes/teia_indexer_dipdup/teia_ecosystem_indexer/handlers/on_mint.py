@@ -13,14 +13,13 @@ async def on_mint(
     metadata_hex = transaction.parameter.token_info.get('')
     metadata_uri = bytes.fromhex(metadata_hex).decode('utf-8') if metadata_hex else None
 
-    # Ensure the canonical identity exists and store BOTH the FK and legacy string (safe rollout)
+    # Ensure the canonical identity exists
     creator_holder, _ = await models.Holder.get_or_create(address=transaction.parameter.address)
 
     await models.Token.create(
         contract=transaction.data.target_address,
         token_id=transaction.parameter.token_id,
         creator=creator_holder,
-        creator_address=transaction.parameter.address,
         supply=transaction.parameter.amount,
         metadata_uri=metadata_uri,
         metadata_synced=False,

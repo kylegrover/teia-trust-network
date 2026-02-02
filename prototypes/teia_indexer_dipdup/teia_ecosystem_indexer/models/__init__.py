@@ -12,8 +12,7 @@ class MarketVersion(str, Enum):
 
 class Holder(Model):
     """Canonical identity registry (address is stored ONCE).
-    - Backwards-compatible: handlers will continue writing legacy string columns until migration completes.
-    - Small: keeps the hot index compact (INT PK, unique address).
+    Small and efficient: keeps the hot index compact (INT PK, unique address).
     """
 
     id = fields.IntField(pk=True)
@@ -27,12 +26,10 @@ class Token(Model):
     # The FA2 contract address (e.g. KT1RJ6...)
     contract = fields.CharField(max_length=36)
     token_id = fields.BigIntField()
-    # New canonical FK to the Identity registry (nullable until migration completes)
+    # Canonical FK to the Identity registry
     creator: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField(
-        'models.Holder', related_name='tokens', null=True
+        'models.Holder', related_name='tokens'
     )
-    # Legacy string (kept during rollout/backfill) — will be removed in a later migration
-    creator_address = fields.CharField(max_length=36, null=True)
     supply = fields.BigIntField()
     # IPFS URI (e.g. ipfs://Qm...)
     metadata_uri = fields.TextField(null=True)
@@ -52,10 +49,8 @@ class Swap(Model):
     contract_address = fields.CharField(max_length=36)
     market_version = fields.EnumField(MarketVersion)
 
-    # Canonical FK to `Holder` (nullable until migration completes)
-    seller: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField('models.Holder', related_name='swaps', null=True)
-    # Legacy string retained for compatibility/backfill
-    seller_address = fields.CharField(max_length=36, null=True)
+    # Canonical FK to `Holder`
+    seller: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField('models.Holder', related_name='swaps')
     token = fields.ForeignKeyField('models.Token', related_name='swaps')
 
     amount_initial = fields.BigIntField()
@@ -76,10 +71,8 @@ class Trade(Model):
     swap = fields.ForeignKeyField('models.Swap', related_name='trades')
     # FK to Holder for compact storage
     buyer: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField(
-        'models.Holder', related_name='purchases', null=True
+        'models.Holder', related_name='purchases'
     )
-    # Legacy string (nullable during rollout)
-    buyer_address = fields.CharField(max_length=36, null=True)
     amount = fields.BigIntField()
     price_mutez = fields.BigIntField()  # Snapshot price at time of sale
     timestamp = fields.DatetimeField()

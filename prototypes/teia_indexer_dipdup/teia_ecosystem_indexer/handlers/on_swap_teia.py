@@ -37,7 +37,6 @@ async def on_swap_teia(
         token_id=transaction.parameter.objkt_id,
         defaults={
             'creator': creator_holder,
-            'creator_address': transaction.parameter.creator,
             'supply': 0,
             'timestamp': transaction.data.timestamp,
         },
@@ -51,7 +50,6 @@ async def on_swap_teia(
         contract_address=transaction.data.target_address,
         market_version=models.MarketVersion.TEIA,
         seller=seller_holder,
-        seller_address=transaction.data.sender_address,
         token=token,
         amount_initial=transaction.parameter.objkt_amount,
         amount_left=transaction.parameter.objkt_amount,

@@ -62,9 +62,11 @@ async def on_collect_teia(
         swap.status = 'finished'
     await swap.save()
 
+    buyer_holder, _ = await models.Holder.get_or_create(address=transaction.data.sender_address)
+
     await models.Trade.create(
         swap=swap,
-        buyer_address=transaction.data.sender_address,
+        buyer=buyer_holder,
         amount=amount_collected,
         price_mutez=swap.price_mutez,
         timestamp=transaction.data.timestamp,
