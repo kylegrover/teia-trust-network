@@ -51,6 +51,10 @@ indexes:
         pattern:
           - destination: hen_objkts
             entrypoint: mint
+      - callback: on_transfer
+        pattern:
+          - destination: hen_objkts
+            entrypoint: transfer
 
   # 2. V1 Market Indexing
   market_v1_index:
