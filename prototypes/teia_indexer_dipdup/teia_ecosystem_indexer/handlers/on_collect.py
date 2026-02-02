@@ -2,6 +2,7 @@ from dipdup.context import HandlerContext
 from dipdup.models.tezos import TezosTransaction
 
 from teia_ecosystem_indexer import models
+from teia_ecosystem_indexer.utils import resolve_address_async
 from teia_ecosystem_indexer.types.hen_v2.tezos_parameters.collect import CollectParameter as HenCollect
 from teia_ecosystem_indexer.types.teia_market.tezos_parameters.collect import CollectParameter as TeiaCollect
 
@@ -52,7 +53,8 @@ async def on_collect(
         # We try to find the swap we saved in on_swap
         swap = await models.Swap.get_or_none(swap_id=swap_id, contract=contract)
         if swap:
-            seller_address = swap.seller_address
+            # Prefer the interned holder when possible; fall back to legacy string during rollout
+            seller_address = await resolve_address_async(swap, 'seller', 'seller_address')
             token_id = swap.token_id
         else:
             # This happens if the Swap was created BEFORE we started indexing (Historical)
