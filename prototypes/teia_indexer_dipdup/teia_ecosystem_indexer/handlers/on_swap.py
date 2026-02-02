@@ -38,10 +38,13 @@ async def on_swap(
         # print(f"⚠️  SWAP WITHOUT ID: {seller} listed {token_id}")
         return
 
-    # 3. Save to Database
+    # 3. Save to Database — ensure we populate the canonical identity registry (safe, non-breaking)
+    seller_holder, _ = await models.Holder.get_or_create(address=seller)
+
     await models.Swap.create(
         swap_id=swap_id,
         contract=contract,
+        seller=seller_holder,
         seller_address=seller,
         token_id=token_id,
         price_mutez=price,

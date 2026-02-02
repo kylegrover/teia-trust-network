@@ -59,7 +59,12 @@ async def on_collect(
             # For a perfect graph, we'd need to backfill further.
             seller_address = 'Historical_Seller'
 
-    # 3. Save the Trust Edge
+    # 3. Ensure the registry contains both participants (builds the Identity table gradually),
+    #    then create the TrustEdge using the existing schema (backfill/migration will attach FKs later).
+    await models.Holder.get_or_create(address=buyer)
+    if seller_address:
+        await models.Holder.get_or_create(address=seller_address)
+
     await models.TrustEdge.create(
         buyer_address=buyer,
         seller_address=seller_address,

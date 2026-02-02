@@ -22,6 +22,14 @@ Tezos Data & Indexing
     - (https://github.com/spruceid/tzprofiles)
 - Teztok: (shutdown but open source)
     - https://github.com/teztok/indexer
+- https://docs.tezos.com
+    - https://docs.tezos.com/allPageSourceFiles.txt for full docs search
+    - /developing/ipfs
+    - /architecture/tokens
+    - /architecture/data-availability-layer
+    - /architecture/accounts
+    - etc
+- tezos tallin: https://spotlight.tezos.com/tallinn-is-live/
 
 Algorithms & Math
 - EigenTrust++: The core algorithm for global reputation scoring.

@@ -1,7 +1,9 @@
 from dipdup.context import HandlerContext
 from dipdup.models.tezos import TezosTransaction
-from teia_ecosystem_indexer.types.teia_market.tezos_parameters.collect import CollectParameter
+
 from teia_ecosystem_indexer import models
+from teia_ecosystem_indexer.types.teia_market.tezos_parameters.collect import CollectParameter
+
 
 async def on_collect_teia(
     ctx: HandlerContext,
@@ -21,7 +23,7 @@ async def on_collect_teia(
                 return None
         # dict-like (RPC)
         if isinstance(param, dict):
-            for key in ("__root__", "root", "swap_id"):
+            for key in ('__root__', 'root', 'swap_id'):
                 if key in param:
                     try:
                         return int(param[key])
@@ -29,7 +31,7 @@ async def on_collect_teia(
                         return None
             return None
         # pydantic / model-like
-        for attr in ("__root__", "root", "swap_id"):
+        for attr in ('__root__', 'root', 'swap_id'):
             if hasattr(param, attr):
                 try:
                     return int(getattr(param, attr))
@@ -53,11 +55,11 @@ async def on_collect_teia(
         return
 
     # In Teia/HEN, collect usually implies 1 item unless batching (which isn't this entrypoint)
-    amount_collected = 1 
+    amount_collected = 1
 
     swap.amount_left -= amount_collected
     if swap.amount_left <= 0:
-        swap.status = "finished"
+        swap.status = 'finished'
     await swap.save()
 
     await models.Trade.create(
@@ -65,5 +67,5 @@ async def on_collect_teia(
         buyer_address=transaction.data.sender_address,
         amount=amount_collected,
         price_mutez=swap.price_mutez,
-        timestamp=transaction.data.timestamp
+        timestamp=transaction.data.timestamp,
     )

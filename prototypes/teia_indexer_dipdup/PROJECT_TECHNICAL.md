@@ -99,6 +99,17 @@ Recent changelog (2026-02-01)
 
 Tests & next technical work (recommended)
 ----------------------------------------
+
+### Address interning (Tallinn) — proposal & migration 🔧
+- Problem: high-volume tables store 36-char Tezos addresses repeatedly (large indexes, expensive joins).  
+- Change: add a compact `holder` (identity) table and switch high-cardinality columns to an INT FK while retaining legacy string columns during rollout.  
+- This repo: DIPDUP models currently store addresses as strings (e.g. `Token.creator_address`, `Swap.seller_address`, `Trade.buyer_address`). Added `Holder` model + nullable FKs and a safe backfill SQL in `sql/on_reindex/0001_address_interning.*`.
+
+Migration (summary):
+1. Run the Postgres migration: `psql $DATABASE_URL -f sql/on_reindex/0001_address_interning.postgres.sql` (dev: use the SQLite variant and `scripts/backfill_address_interning.py`).
+2. Let the indexer run for a day to populate any missing identities (handlers now ensure `Holder` rows are created on write).
+3. Create/verify FK constraints and remove legacy string columns in a follow-up migration.
+
 Priority (high → low):
 1. Add unit tests for handlers that feed both dict- and object-shaped `diff` and `parameter` inputs. (Protects regressions.)
 2. Centralize normalization helpers (e.g. `teia_ecosystem_indexer.utils.normalize`) and replace duplicated code in handlers.
