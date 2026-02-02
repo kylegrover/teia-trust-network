@@ -54,3 +54,8 @@ Federation Protocols
 - Nostr NIP-32: Standard for "Labeling" entities.
     - (https://nips.nostr.com/32)
 
+
+
+UI
+- Force Graph https://github.com/vasturiano/force-graph
+    - Force-directed graph rendered on HTML5 canvas.
