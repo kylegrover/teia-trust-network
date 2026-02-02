@@ -1,0 +1,405 @@
+{
+  "generated_at": "2026-02-02T05:20:37.282100",
+  "reports": [
+    {
+      "path": "db_backups/teia_ecosystem.sqlite3",
+      "timestamp": "2026-02-02T05:20:30.000726",
+      "vacuumed_path": "/tmp/teia_vac_oeywe0o4/teia_ecosystem.sqlite3",
+      "bytes": 207896576,
+      "tables": [
+        "dipdup_contract",
+        "dipdup_contract_metadata",
+        "dipdup_head",
+        "dipdup_index",
+        "dipdup_meta",
+        "dipdup_model_update",
+        "dipdup_schema",
+        "dipdup_token_metadata",
+        "holder",
+        "sqlite_sequence",
+        "swap",
+        "token",
+        "trade"
+      ],
+      "swap_count": 0,
+      "trade_count": 0,
+      "token_count": 876744,
+      "trustedge_count": null,
+      "holder_count": 58366,
+      "distinct_seller_addresses": 0,
+      "swap_missing_seller_id": 0,
+      "avg_seller_address_len": null,
+      "freelist_count": 0,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_swap_1",
+          "unique": true,
+          "columns": [
+            "contract_address",
+            "swap_id"
+          ]
+        }
+      ],
+      "heavy_address": "tz1QtdHKG7bNxYvo9KN5xc94BpmQvtYrVqkU",
+      "table_info_swap": [
+        "<sqlite3.Row object at 0x7f1a7cdf4160>",
+        "<sqlite3.Row object at 0x7f1a7cdf4400>",
+        "<sqlite3.Row object at 0x7f1a7cdf4430>",
+        "<sqlite3.Row object at 0x7f1a7cdf4490>",
+        "<sqlite3.Row object at 0x7f1a7cdf44c0>",
+        "<sqlite3.Row object at 0x7f1a7cdf4520>",
+        "<sqlite3.Row object at 0x7f1a7cdf4580>",
+        "<sqlite3.Row object at 0x7f1a7cdf45e0>",
+        "<sqlite3.Row object at 0x7f1a7cdf4640>",
+        "<sqlite3.Row object at 0x7f1a7cdf46a0>",
+        "<sqlite3.Row object at 0x7f1a7cdf46d0>",
+        "<sqlite3.Row object at 0x7f1a7cdf4730>",
+        "<sqlite3.Row object at 0x7f1a7cdf4790>"
+      ],
+      "table_info_token": [
+        "<sqlite3.Row object at 0x7f1a7cdf4940>",
+        "<sqlite3.Row object at 0x7f1a7cdf4970>",
+        "<sqlite3.Row object at 0x7f1a7cdf49d0>",
+        "<sqlite3.Row object at 0x7f1a7cdf4a00>",
+        "<sqlite3.Row object at 0x7f1a7cdf4a90>",
+        "<sqlite3.Row object at 0x7f1a7cdf4af0>",
+        "<sqlite3.Row object at 0x7f1a7cdf4b50>",
+        "<sqlite3.Row object at 0x7f1a7cdf4bb0>",
+        "<sqlite3.Row object at 0x7f1a7cdf4be0>",
+        "<sqlite3.Row object at 0x7f1a7cdf4c40>"
+      ],
+      "sample_swap": [],
+      "sample_token": [
+        {
+          "id": 1,
+          "contract": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+          "token_id": 152,
+          "creator_address": "tz1UBZUkXpKGhYsP5KtzDNqLLchwF4uHrGjw",
+          "supply": 1,
+          "metadata_uri": "ipfs://Qma11k6ahPRXGVV7RgHNuLuwB9PqQB2MVJUtNNXJ7dQeAr",
+          "metadata": null,
+          "metadata_synced": 0,
+          "timestamp": "2021-03-01 03:39:21+00:00",
+          "creator_id": 1
+        },
+        {
+          "id": 2,
+          "contract": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+          "token_id": 153,
+          "creator_address": "tz1UBZUkXpKGhYsP5KtzDNqLLchwF4uHrGjw",
+          "supply": 2,
+          "metadata_uri": "ipfs://QmeaqRBUiw4cJiNKEcW2noc7egLd5GgBqLcHHqUhauJAHN",
+          "metadata": null,
+          "metadata_synced": 0,
+          "timestamp": "2021-03-01 07:27:27+00:00",
+          "creator_id": 1
+        },
+        {
+          "id": 3,
+          "contract": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+          "token_id": 154,
+          "creator_address": "tz1UBZUkXpKGhYsP5KtzDNqLLchwF4uHrGjw",
+          "supply": 2,
+          "metadata_uri": "ipfs://QmUxvVm8vxZ8zzxD8zU4ZCsKUPHc888ztrkaFcGasEKzbp",
+          "metadata": null,
+          "metadata_synced": 0,
+          "timestamp": "2021-03-01 07:32:27+00:00",
+          "creator_id": 1
+        },
+        {
+          "id": 4,
+          "contract": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+          "token_id": 155,
+          "creator_address": "tz2G5SBeAJVbiE1icji3P59Lx8EvcwMLEHp3",
+          "supply": 5,
+          "metadata_uri": "ipfs://QmPdZuUXnTJSVgZNYYWgfkcgYrd3kUjmJV6Ba5FyMuyM2d",
+          "metadata": null,
+          "metadata_synced": 0,
+          "timestamp": "2021-03-01 10:37:07+00:00",
+          "creator_id": 2
+        },
+        {
+          "id": 5,
+          "contract": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+          "token_id": 156,
+          "creator_address": "tz2G5SBeAJVbiE1icji3P59Lx8EvcwMLEHp3",
+          "supply": 5,
+          "metadata_uri": "ipfs://QmeDfhJZn7wTh1h5UNUJKM5CcD8LGTpR5RaT3D35NZv35Q",
+          "metadata": null,
+          "metadata_synced": 0,
+          "timestamp": "2021-03-01 11:03:07+00:00",
+          "creator_id": 2
+        }
+      ],
+      "sample_holder": [
+        {
+          "id": 1,
+          "address": "tz1UBZUkXpKGhYsP5KtzDNqLLchwF4uHrGjw",
+          "first_seen": null,
+          "last_seen": null
+        },
+        {
+          "id": 2,
+          "address": "tz2G5SBeAJVbiE1icji3P59Lx8EvcwMLEHp3",
+          "first_seen": null,
+          "last_seen": null
+        },
+        {
+          "id": 3,
+          "address": "tz1ZdMfzmWLb8mu22jE7rZ8Y3t9iKezM68cq",
+          "first_seen": null,
+          "last_seen": null
+        },
+        {
+          "id": 4,
+          "address": "tz1Rux3pGrp2KpZUBKvg3VQ4edRYVJsapr4z",
+          "first_seen": null,
+          "last_seen": null
+        },
+        {
+          "id": 5,
+          "address": "tz1hkNPg5jQ66pJpZH2boiF5AnbAcd1dt5KS",
+          "first_seen": null,
+          "last_seen": null
+        }
+      ],
+      "bench_legacy": {
+        "runs": 5,
+        "median_s": 3.787004970945418e-06,
+        "mean_s": 9.482001769356429e-06,
+        "min_s": 3.5270059015601873e-06,
+        "max_s": 3.138900501653552e-05,
+        "result_count": 0
+      },
+      "bench_interned": {
+        "runs": 5,
+        "median_s": 3.616994945332408e-06,
+        "mean_s": 8.814796456135809e-06,
+        "min_s": 3.4760014386847615e-06,
+        "max_s": 2.919598773587495e-05,
+        "result_count": 0
+      },
+      "bench_token_legacy": {
+        "runs": 5,
+        "median_s": 0.061692203002166934,
+        "mean_s": 0.06184449160064105,
+        "min_s": 0.06126550199405756,
+        "max_s": 0.06317920199944638,
+        "result_count": 5029
+      },
+      "explain_legacy": [
+        "<sqlite3.Row object at 0x7f1a7d161600>"
+      ],
+      "explain_interned": [
+        "<sqlite3.Row object at 0x7f1a7cdf4fa0>",
+        "<sqlite3.Row object at 0x7f1a7cdf4e50>",
+        "<sqlite3.Row object at 0x7f1a7cdf50c0>"
+      ],
+      "explain_token_legacy": [
+        "<sqlite3.Row object at 0x7f1a7cdf50f0>"
+      ]
+    },
+    {
+      "path": "db_backups/teia_ecosystem_backfilled.sqlite3",
+      "timestamp": "2026-02-02T05:20:33.680929",
+      "vacuumed_path": "/tmp/teia_vac_299y7ywf/teia_ecosystem_backfilled.sqlite3",
+      "bytes": 207896576,
+      "tables": [
+        "dipdup_contract",
+        "dipdup_contract_metadata",
+        "dipdup_head",
+        "dipdup_index",
+        "dipdup_meta",
+        "dipdup_model_update",
+        "dipdup_schema",
+        "dipdup_token_metadata",
+        "holder",
+        "sqlite_sequence",
+        "swap",
+        "token",
+        "trade"
+      ],
+      "swap_count": 0,
+      "trade_count": 0,
+      "token_count": 876744,
+      "trustedge_count": null,
+      "holder_count": 58366,
+      "distinct_seller_addresses": 0,
+      "swap_missing_seller_id": 0,
+      "avg_seller_address_len": null,
+      "freelist_count": 0,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_swap_1",
+          "unique": true,
+          "columns": [
+            "contract_address",
+            "swap_id"
+          ]
+        }
+      ],
+      "heavy_address": "tz1QtdHKG7bNxYvo9KN5xc94BpmQvtYrVqkU",
+      "table_info_swap": [
+        "<sqlite3.Row object at 0x7f1a7cdf4df0>",
+        "<sqlite3.Row object at 0x7f1a7cdf52d0>",
+        "<sqlite3.Row object at 0x7f1a7cdf5300>",
+        "<sqlite3.Row object at 0x7f1a7cdf5360>",
+        "<sqlite3.Row object at 0x7f1a7cdf5390>",
+        "<sqlite3.Row object at 0x7f1a7cdf53f0>",
+        "<sqlite3.Row object at 0x7f1a7cdf5450>",
+        "<sqlite3.Row object at 0x7f1a7cdf54b0>",
+        "<sqlite3.Row object at 0x7f1a7cdf5510>",
+        "<sqlite3.Row object at 0x7f1a7cdf5570>",
+        "<sqlite3.Row object at 0x7f1a7cdf55a0>",
+        "<sqlite3.Row object at 0x7f1a7cdf5600>",
+        "<sqlite3.Row object at 0x7f1a7cdf5660>"
+      ],
+      "table_info_token": [
+        "<sqlite3.Row object at 0x7f1a7cdf5810>",
+        "<sqlite3.Row object at 0x7f1a7cdf5840>",
+        "<sqlite3.Row object at 0x7f1a7cdf58a0>",
+        "<sqlite3.Row object at 0x7f1a7cdf58d0>",
+        "<sqlite3.Row object at 0x7f1a7cdf5960>",
+        "<sqlite3.Row object at 0x7f1a7cdf59c0>",
+        "<sqlite3.Row object at 0x7f1a7cdf5a20>",
+        "<sqlite3.Row object at 0x7f1a7cdf5a80>",
+        "<sqlite3.Row object at 0x7f1a7cdf5ab0>",
+        "<sqlite3.Row object at 0x7f1a7cdf5b10>"
+      ],
+      "sample_swap": [],
+      "sample_token": [
+        {
+          "id": 1,
+          "contract": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+          "token_id": 152,
+          "creator_address": "tz1UBZUkXpKGhYsP5KtzDNqLLchwF4uHrGjw",
+          "supply": 1,
+          "metadata_uri": "ipfs://Qma11k6ahPRXGVV7RgHNuLuwB9PqQB2MVJUtNNXJ7dQeAr",
+          "metadata": null,
+          "metadata_synced": 0,
+          "timestamp": "2021-03-01 03:39:21+00:00",
+          "creator_id": 1
+        },
+        {
+          "id": 2,
+          "contract": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+          "token_id": 153,
+          "creator_address": "tz1UBZUkXpKGhYsP5KtzDNqLLchwF4uHrGjw",
+          "supply": 2,
+          "metadata_uri": "ipfs://QmeaqRBUiw4cJiNKEcW2noc7egLd5GgBqLcHHqUhauJAHN",
+          "metadata": null,
+          "metadata_synced": 0,
+          "timestamp": "2021-03-01 07:27:27+00:00",
+          "creator_id": 1
+        },
+        {
+          "id": 3,
+          "contract": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+          "token_id": 154,
+          "creator_address": "tz1UBZUkXpKGhYsP5KtzDNqLLchwF4uHrGjw",
+          "supply": 2,
+          "metadata_uri": "ipfs://QmUxvVm8vxZ8zzxD8zU4ZCsKUPHc888ztrkaFcGasEKzbp",
+          "metadata": null,
+          "metadata_synced": 0,
+          "timestamp": "2021-03-01 07:32:27+00:00",
+          "creator_id": 1
+        },
+        {
+          "id": 4,
+          "contract": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+          "token_id": 155,
+          "creator_address": "tz2G5SBeAJVbiE1icji3P59Lx8EvcwMLEHp3",
+          "supply": 5,
+          "metadata_uri": "ipfs://QmPdZuUXnTJSVgZNYYWgfkcgYrd3kUjmJV6Ba5FyMuyM2d",
+          "metadata": null,
+          "metadata_synced": 0,
+          "timestamp": "2021-03-01 10:37:07+00:00",
+          "creator_id": 2
+        },
+        {
+          "id": 5,
+          "contract": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+          "token_id": 156,
+          "creator_address": "tz2G5SBeAJVbiE1icji3P59Lx8EvcwMLEHp3",
+          "supply": 5,
+          "metadata_uri": "ipfs://QmeDfhJZn7wTh1h5UNUJKM5CcD8LGTpR5RaT3D35NZv35Q",
+          "metadata": null,
+          "metadata_synced": 0,
+          "timestamp": "2021-03-01 11:03:07+00:00",
+          "creator_id": 2
+        }
+      ],
+      "sample_holder": [
+        {
+          "id": 1,
+          "address": "tz1UBZUkXpKGhYsP5KtzDNqLLchwF4uHrGjw",
+          "first_seen": null,
+          "last_seen": null
+        },
+        {
+          "id": 2,
+          "address": "tz2G5SBeAJVbiE1icji3P59Lx8EvcwMLEHp3",
+          "first_seen": null,
+          "last_seen": null
+        },
+        {
+          "id": 3,
+          "address": "tz1ZdMfzmWLb8mu22jE7rZ8Y3t9iKezM68cq",
+          "first_seen": null,
+          "last_seen": null
+        },
+        {
+          "id": 4,
+          "address": "tz1Rux3pGrp2KpZUBKvg3VQ4edRYVJsapr4z",
+          "first_seen": null,
+          "last_seen": null
+        },
+        {
+          "id": 5,
+          "address": "tz1hkNPg5jQ66pJpZH2boiF5AnbAcd1dt5KS",
+          "first_seen": null,
+          "last_seen": null
+        }
+      ],
+      "bench_legacy": {
+        "runs": 5,
+        "median_s": 3.6569981602951884e-06,
+        "mean_s": 6.881001172587275e-06,
+        "min_s": 3.506997018121183e-06,
+        "max_s": 1.9427010556682944e-05,
+        "result_count": 0
+      },
+      "bench_interned": {
+        "runs": 5,
+        "median_s": 3.496010322123766e-06,
+        "mean_s": 7.069003186188638e-06,
+        "min_s": 3.4460099413990974e-06,
+        "max_s": 2.0988998585380614e-05,
+        "result_count": 0
+      },
+      "bench_token_legacy": {
+        "runs": 5,
+        "median_s": 0.06091273699712474,
+        "mean_s": 0.06103487979853526,
+        "min_s": 0.05985683399194386,
+        "max_s": 0.06220151200250257,
+        "result_count": 5029
+      },
+      "explain_legacy": [
+        "<sqlite3.Row object at 0x7f1a7cdf5d50>"
+      ],
+      "explain_interned": [
+        "<sqlite3.Row object at 0x7f1a7cdf5ea0>",
+        "<sqlite3.Row object at 0x7f1a7cdf5f00>",
+        "<sqlite3.Row object at 0x7f1a7cdf5de0>"
+      ],
+      "explain_token_legacy": [
+        "<sqlite3.Row object at 0x7f1a7cdf5fc0>"
+      ]
+    },
+    {
+      "path": "db_backups/teia_ecosystem_backup_commit_84825d.sqlite3",
+      "error": "db_backups/teia_ecosystem_backup_commit_84825d.sqlite3"
+    }
+  ]
+}

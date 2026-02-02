@@ -1,0 +1,57 @@
+{
+  "generated_at": "2026-02-02T05:13:03.283887",
+  "reports": [
+    {
+      "path": "db_backups/teia_ecosystem.sqlite3",
+      "timestamp": "2026-02-02T05:12:57.312446",
+      "vacuumed_path": "/tmp/teia_vac_ple9_s1g/teia_ecosystem.sqlite3",
+      "bytes": 207896576,
+      "swap_count": 0,
+      "trade_count": 0,
+      "holder_count": 58366,
+      "distinct_seller_addresses": 0,
+      "swap_missing_seller_id": 0,
+      "avg_seller_address_len": null,
+      "freelist_count": 0,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_swap_1",
+          "unique": true,
+          "columns": [
+            "contract_address",
+            "swap_id"
+          ]
+        }
+      ],
+      "heavy_address": null
+    },
+    {
+      "path": "db_backups/teia_ecosystem_backfilled.sqlite3",
+      "timestamp": "2026-02-02T05:13:00.303998",
+      "vacuumed_path": "/tmp/teia_vac_u_95195_/teia_ecosystem_backfilled.sqlite3",
+      "bytes": 207896576,
+      "swap_count": 0,
+      "trade_count": 0,
+      "holder_count": 58366,
+      "distinct_seller_addresses": 0,
+      "swap_missing_seller_id": 0,
+      "avg_seller_address_len": null,
+      "freelist_count": 0,
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_swap_1",
+          "unique": true,
+          "columns": [
+            "contract_address",
+            "swap_id"
+          ]
+        }
+      ],
+      "heavy_address": null
+    },
+    {
+      "path": "db_backups/teia_ecosystem_backup_commit_84825d.sqlite3",
+      "error": "db_backups/teia_ecosystem_backup_commit_84825d.sqlite3"
+    }
+  ]
+}
