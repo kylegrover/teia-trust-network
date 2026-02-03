@@ -13,7 +13,7 @@ async def on_swap_teia(
     try:
         swap_id = int(transaction.storage.counter) - 1
     except (ValueError, TypeError, AttributeError):
-        ctx.logger.error(f"Failed to get swap_id from storage at level {transaction.data.level}")
+        ctx.logger.error('Failed to get swap_id from storage at level %s', transaction.data.level)
         return
 
     objkt_contract = await utils.get_contract(transaction.parameter.fa2, 'hen_objkts')
@@ -46,6 +46,6 @@ async def on_swap_teia(
             'royalties_permille': transaction.parameter.royalties,
             'timestamp': transaction.data.timestamp,
             'status': models.SwapStatus.ACTIVE,
-        }
+        },
     )
     # ctx.logger.info(f"  [Teia] Swap {swap_id} created/updated for token {token.token_id}")

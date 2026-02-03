@@ -18,7 +18,7 @@ async def on_mint(
     creator_holder = await utils.get_holder(transaction.parameter.address, transaction.data.timestamp)
     contract = await utils.get_contract(transaction.data.target_address, 'hen_objkts')
 
-    token, created = await models.Token.get_or_create(
+    token, _created = await models.Token.get_or_create(
         contract=contract,
         token_id=int(transaction.parameter.token_id),
         defaults={
@@ -27,7 +27,7 @@ async def on_mint(
             'metadata_uri': metadata_uri,
             'metadata_synced': False,
             'timestamp': transaction.data.timestamp,
-        }
+        },
     )
 
     # Initialize Creator Balance

@@ -13,7 +13,7 @@ async def on_swap_v2(
     try:
         swap_id = int(transaction.storage.counter) - 1
     except (ValueError, TypeError, AttributeError):
-        ctx.logger.error(f"Failed to get swap_id from V2 storage at level {transaction.data.level}")
+        ctx.logger.error('Failed to get swap_id from V2 storage at level %s', transaction.data.level)
         return
 
     objkt_contract_address = 'KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton'
@@ -48,6 +48,6 @@ async def on_swap_v2(
             'royalties_permille': transaction.parameter.royalties,
             'timestamp': transaction.data.timestamp,
             'status': models.SwapStatus.ACTIVE,
-        }
+        },
     )
     # ctx.logger.info(f"  [V2] Swap {swap_id} created/updated for token {token.token_id}")

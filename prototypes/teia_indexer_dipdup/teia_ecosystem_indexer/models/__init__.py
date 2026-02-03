@@ -39,7 +39,7 @@ class Holder(Model):
     id = fields.IntField(pk=True)
     address = fields.CharField(max_length=36, unique=True)
     name = fields.TextField(null=True, index=True)
-    
+
     metadata_uri = fields.TextField(null=True)
     metadata_synced = fields.BooleanField(default=False, index=True)
 
@@ -84,6 +84,7 @@ class Token(Model):
 
 class TokenHolder(Model):
     """Tracks the current quantity of a token held by an address."""
+
     id = fields.BigIntField(pk=True)
     token = fields.ForeignKeyField('models.Token', related_name='holders')
     holder = fields.ForeignKeyField('models.Holder', related_name='holdings')
@@ -107,7 +108,7 @@ class TokenMetadata(Model):
     # Extract searchable fields for indexing
     name = fields.TextField(null=True, index=True)
     description = fields.TextField(null=True)
-    
+
     # MIME type and rich URIs
     mime = fields.TextField(null=True, index=True)
     artifact_uri = fields.TextField(null=True)
@@ -123,6 +124,7 @@ class Tag(Model):
     id = fields.IntField(pk=True)
     name = fields.CharField(max_length=255, unique=True, index=True)
 
+
 class TokenTag(Model):
     id = fields.BigIntField(pk=True)
     token = fields.ForeignKeyField('models.Token', related_name='tags')
@@ -134,6 +136,7 @@ class TokenTag(Model):
 
 class IgnoredCid(Model):
     """CIDs that are known bad or have failed too many times."""
+
     cid = fields.CharField(max_length=100, pk=True)
     reason = fields.TextField(null=True)
     timestamp = fields.DatetimeField(auto_now_add=True)

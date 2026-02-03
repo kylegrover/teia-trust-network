@@ -2,11 +2,10 @@ from dipdup.context import HandlerContext
 from dipdup.models.tezos import TezosTransaction
 
 from teia_ecosystem_indexer import models as models
+from teia_ecosystem_indexer import utils
 from teia_ecosystem_indexer.types.hen_minter_v1.tezos_parameters.cancel_swap import CancelSwapParameter
 from teia_ecosystem_indexer.types.hen_minter_v1.tezos_storage import HenMinterV1Storage
 
-
-from teia_ecosystem_indexer import utils
 
 async def on_cancel_swap_v1(
     ctx: HandlerContext,

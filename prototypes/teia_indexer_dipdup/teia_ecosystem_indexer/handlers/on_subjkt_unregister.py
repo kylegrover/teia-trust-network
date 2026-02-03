@@ -10,7 +10,7 @@ async def on_subjkt_unregister(
     unregistry: TezosTransaction,
 ) -> None:
     holder = await utils.get_holder(unregistry.data.sender_address, unregistry.data.timestamp)
-    
+
     # 1. Clear handle
     holder.name = None
     holder.metadata_uri = None
@@ -20,4 +20,4 @@ async def on_subjkt_unregister(
     # 2. Delete sidecar metadata if it exists
     await models.HolderMetadata.filter(holder=holder).delete()
 
-    ctx.logger.info(f"Unregistered subjkt for {unregistry.data.sender_address}")
+    ctx.logger.info('Unregistered subjkt for %s', unregistry.data.sender_address)

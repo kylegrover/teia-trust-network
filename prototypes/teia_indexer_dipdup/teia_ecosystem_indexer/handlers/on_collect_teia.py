@@ -15,7 +15,7 @@ async def on_collect_teia(
         # Pydantic models in DipDup often use .root for simple types
         swap_id = int(transaction.parameter.root)
     except (AttributeError, ValueError, TypeError):
-        ctx.logger.error(f"Failed to parse swap_id from teia_market parameter at level {transaction.data.level}")
+        ctx.logger.error('Failed to parse swap_id from teia_market parameter at level %s', transaction.data.level)
         return
 
     contract = await utils.get_contract(transaction.data.target_address, 'teia_market')

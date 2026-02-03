@@ -15,12 +15,12 @@ async def on_collect_v2(
     try:
         swap_id = int(collect.parameter.root)
     except (ValueError, TypeError, AttributeError):
-        ctx.logger.error(f"Failed to parse swap_id (root) from parameter at level {collect.data.level}")
+        ctx.logger.error('Failed to parse swap_id (root) from parameter at level %s', collect.data.level)
         return
 
     contract = await utils.get_contract(collect.data.target_address, 'hen_market_v2')
     swap = await models.Swap.get_or_none(swap_id=swap_id, contract=contract)
-    
+
     if not swap:
         # ctx.logger.warning(f"Swap {swap_id} not found for v2 collect at level {collect.data.level}")
         return

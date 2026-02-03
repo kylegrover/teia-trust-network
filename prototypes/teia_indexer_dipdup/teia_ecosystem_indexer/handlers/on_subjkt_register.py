@@ -14,10 +14,10 @@ async def on_subjkt_register(
     # 1. Decode subjkts name/metadata
     field_a = registry.parameter.metadata
     field_b = registry.parameter.subjkt
-    
+
     def _clean_val(val: str) -> str:
         if not val:
-            return ""
+            return ''
         # 1. Try to decode hex if it looks like hex
         decoded = utils.from_hex(val)
         # 2. Ensure null bytes are stripped (postgres protection)
@@ -27,7 +27,7 @@ async def on_subjkt_register(
     val_b = _clean_val(field_b)
 
     # 2. Logic to distinguish Handle from IPFS URI
-    # Typically metadata = name and subjkt = ipfs, but it can be reversed 
+    # Typically metadata = name and subjkt = ipfs, but it can be reversed
     # depending on the wallet/app used to register.
     name = None
     uri = None
@@ -40,12 +40,12 @@ async def on_subjkt_register(
 
     # 3. Update Holder
     holder = await utils.get_holder(registry.data.sender_address, registry.data.timestamp)
-    
+
     holder.name = name
     if uri:
         holder.metadata_uri = uri
         holder.metadata_synced = False
-    
+
     await holder.save()
 
     # ctx.logger.info(f"Registered subjkt: {name} URI: {uri} for {registry.data.sender_address}")

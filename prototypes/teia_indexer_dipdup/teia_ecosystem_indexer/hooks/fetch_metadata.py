@@ -57,7 +57,7 @@ async def fetch_metadata(ctx: HookContext) -> None:
 
             if data:
                 # Extract rich fields
-                mime = ""
+                mime = ''
                 formats = data.get('formats', [])
                 if formats and isinstance(formats, list) and len(formats) > 0 and 'mimeType' in formats[0]:
                     mime = formats[0]['mimeType']

@@ -18,7 +18,6 @@ if TYPE_CHECKING:
 
 from contextlib import suppress
 
-
 # High-speed memory cache for identities to skip heavy DB IO during deep sync
 _HOLDER_CACHE: dict[str, models.Holder] = {}
 _TOKEN_CACHE: dict[str, models.Token] = {}
@@ -50,13 +49,13 @@ def from_hex(hexbytes: str | None) -> str:
         except Exception:
             string = bytes.fromhex(hexbytes).decode('latin-1')
     return clean_null_bytes(string or '')
+
+
+async def get_contract(address: str, typename: str | None = None) -> models.Contract:
     """Fetch contract from memory cache or DB, ensuring it exists."""
     contract = _CONTRACT_CACHE.get(address)
     if not contract:
-        contract, _ = await models.Contract.get_or_create(
-            address=address,
-            defaults={'typename': typename}
-        )
+        contract, _ = await models.Contract.get_or_create(address=address, defaults={'typename': typename})
         if len(_CONTRACT_CACHE) > _MAX_CACHE_SIZE:
             _CONTRACT_CACHE.pop(next(iter(_CONTRACT_CACHE)))
         _CONTRACT_CACHE[address] = contract
@@ -146,14 +145,3 @@ async def resolve_address_async(obj: Any, fk_attr: str, legacy_attr: str) -> str
         return fk
     # 2) fallback to legacy string column (no extra DB hits)
     return getattr(obj, legacy_attr, None)
-
-
-def clean_null_bytes(val: Any) -> Any:
-    """Recursively strip null bytes from strings/dicts/lists to prevent DB errors."""
-    if isinstance(val, str):
-        return val.replace('\0', '').replace('\u0000', '')
-    if isinstance(val, dict):
-        return {clean_null_bytes(k): clean_null_bytes(v) for k, v in val.items()}
-    if isinstance(val, list):
-        return [clean_null_bytes(x) for x in val]
-    return val
