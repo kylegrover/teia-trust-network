@@ -16,6 +16,11 @@ class SwapStatus(str, Enum):
     CANCELED = 'canceled'
 
 
+class ShareholderStatus(str, Enum):
+    BENEFACTOR = 'benefactor'
+    CORE_PARTICIPANT = 'core_participant'
+
+
 class Contract(Model):
     """Canonical contract registry.
     Saves massive space by storing KT1... addresses once.
@@ -37,6 +42,8 @@ class Holder(Model):
     
     metadata_uri = fields.TextField(null=True)
     metadata_synced = fields.BooleanField(default=False, index=True)
+
+    is_split = fields.BooleanField(default=False, index=True)
 
     first_seen = fields.DatetimeField(null=True)
     last_seen = fields.DatetimeField(null=True)
@@ -69,8 +76,22 @@ class Token(Model):
     metadata_synced = fields.BooleanField(default=False, index=True)
     timestamp = fields.DatetimeField(index=True)
 
+    is_signed = fields.BooleanField(default=False, index=True)
+
     class Meta:
         unique_together = ('contract', 'token_id')
+
+
+class TokenHolder(Model):
+    """Tracks the current quantity of a token held by an address."""
+    id = fields.BigIntField(pk=True)
+    token = fields.ForeignKeyField('models.Token', related_name='holders')
+    holder = fields.ForeignKeyField('models.Holder', related_name='holdings')
+    quantity = fields.BigIntField(default=0)
+
+    class Meta:
+        unique_together = ('token', 'holder')
+        table = 'token_holder'
 
 
 class TokenMetadata(Model):
@@ -168,3 +189,33 @@ class Transfer(Model):
     amount = fields.BigIntField()
     timestamp = fields.DatetimeField(index=True)
     level = fields.IntField()
+
+
+class SplitContract(Model):
+    id = fields.IntField(pk=True)
+    contract = fields.OneToOneField('models.Holder', related_name='split_contract_sidecar')
+    administrator = fields.ForeignKeyField('models.Holder', related_name='managed_splits')
+    total_shares = fields.BigIntField()
+
+    class Meta:
+        table = 'split_contract'
+
+
+class Shareholder(Model):
+    id = fields.BigIntField(pk=True)
+    split_contract = fields.ForeignKeyField('models.SplitContract', related_name='shareholders')
+    holder = fields.ForeignKeyField('models.Holder', related_name='shares')
+    shares = fields.BigIntField()
+    holder_type = fields.EnumField(ShareholderStatus, default=ShareholderStatus.BENEFACTOR)
+
+    class Meta:
+        unique_together = ('split_contract', 'holder')
+
+
+class Signature(Model):
+    id = fields.BigIntField(pk=True)
+    token = fields.ForeignKeyField('models.Token', related_name='signatures')
+    holder = fields.ForeignKeyField('models.Holder', related_name='signatures')
+
+    class Meta:
+        unique_together = ('token', 'holder')

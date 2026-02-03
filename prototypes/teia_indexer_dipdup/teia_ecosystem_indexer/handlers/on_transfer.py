@@ -4,6 +4,8 @@ from dipdup.models.tezos import TezosTransaction
 from teia_ecosystem_indexer import models
 from teia_ecosystem_indexer import utils
 
+BURN_ADDRESS = 'tz1burnburnburnburnburnburnburjAYjjX'
+
 
 async def on_transfer(
     ctx: HandlerContext,
@@ -37,6 +39,7 @@ async def on_transfer(
 
             to_holder = await utils.get_holder(to_address, transfer.data.timestamp)
 
+            # Record the transaction
             await models.Transfer.create(
                 token=token,
                 from_holder=from_holder,
@@ -45,3 +48,17 @@ async def on_transfer(
                 timestamp=transfer.data.timestamp,
                 level=transfer.data.level,
             )
+
+            # Update Balances (TokenHolder ledger)
+            sender_holding, _ = await models.TokenHolder.get_or_create(token=token, holder=from_holder)
+            sender_holding.quantity -= amount
+            await sender_holding.save()
+
+            receiver_holding, _ = await models.TokenHolder.get_or_create(token=token, holder=to_holder)
+            receiver_holding.quantity += amount
+            await receiver_holding.save()
+
+            # Supply tracking for burns
+            if to_address == BURN_ADDRESS:
+                token.supply -= amount
+                await token.save()

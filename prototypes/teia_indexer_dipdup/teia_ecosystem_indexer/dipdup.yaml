@@ -59,6 +59,16 @@ contracts:
     address: KT1My1wDZHDGweCrJnQJi3wcFaS67iksirvj
     typename: hen_subjkts
 
+  # Split Contract Factory
+  hen_split_factory:
+    address: KT1DoyD6kr8yLK8mRBFusyKYJUk2ZxNHKP1N
+    typename: hen_split_factory
+
+  # Split Signer
+  hen_split_signer:
+    address: KT1BcLnWRziLDNJNRn3phAANKrEBiXhytsMY
+    typename: hen_split_signer
+
 indexes:
   # 1. Token Indexing (Mints)
   token_index:
@@ -156,6 +166,30 @@ indexes:
         pattern:
           - destination: hen_subjkts
             entrypoint: unregistry
+
+  # 6. Split Contract Originations
+  split_origination_index:
+    kind: tezos.operations
+    datasources:
+      - tzkt
+    handlers:
+      - callback: on_split_origination
+        pattern:
+          - source: hen_split_factory
+            type: origination
+
+  # 7. Split Signatures
+  split_sign_index:
+    kind: tezos.operations
+    datasources:
+      - tzkt
+    contracts:
+      - hen_split_signer
+    handlers:
+      - callback: on_split_sign
+        pattern:
+          - destination: hen_split_signer
+            entrypoint: sign
 
 # Hook to fetch IPFS metadata asynchronously
 hooks:
