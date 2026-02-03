@@ -3,13 +3,21 @@ package: teia_ecosystem_indexer
 
 # Increase watchdog threshold to handle heavy historical transfer batches
 advanced:
-  watchdog_timeout: 120
+  watchdog_timeout: 60
   early_realtime: True
   merge_subscriptions: True
 
+# database:
+#   kind: sqlite
+#   path: teia_ecosystem.sqlite3
+
 database:
-  kind: sqlite
-  path: teia_ecosystem.sqlite3
+  kind: postgres
+  database: teia_indexer
+  host: ${POSTGRES_HOST:-localhost}
+  port: ${POSTGRES_PORT:-5432}
+  password: ${POSTGRES_PASS}
+  user: ${POSTGRES_USER}
   immune_tables:
     - token_metadata
 

@@ -31,3 +31,6 @@
 !.dockerignore
 !**/Dockerfile
 !**/Makefile
+
+# add env example
+!.env.example
