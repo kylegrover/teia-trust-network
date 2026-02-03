@@ -10,6 +10,7 @@ Teia
     - teia market: KT1PHubm9HtyQEJ4BBpMTVomq6mhbfNZ9z5w
 - Teia Moderation Banlist: The source for flagged accounts.
     - 
+- teia hicdex fork: https://github.com/teia-community/hicdex/
 
 
 
