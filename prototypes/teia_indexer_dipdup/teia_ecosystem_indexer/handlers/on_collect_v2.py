@@ -19,7 +19,7 @@ async def on_collect_v2(
         return
 
     contract = await utils.get_contract(collect.data.target_address, 'hen_market_v2')
-    swap = await models.Swap.get_or_none(swap_id=swap_id, contract=contract)
+    swap = await models.Swap.get_or_none(swap_id=swap_id, contract=contract).prefetch_related('token')
 
     if not swap:
         # ctx.logger.warning(f"Swap {swap_id} not found for v2 collect at level {collect.data.level}")
@@ -37,6 +37,9 @@ async def on_collect_v2(
 
     await models.Trade.create(
         swap=swap,
+        token=swap.token,
+        seller_id=swap.seller_id,
+        creator_id=swap.token.creator_id,
         buyer=buyer_holder,
         amount=amount_collected,
         price_mutez=swap.price_mutez,

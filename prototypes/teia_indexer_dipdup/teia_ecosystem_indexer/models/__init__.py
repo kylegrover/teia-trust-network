@@ -168,8 +168,12 @@ class Swap(Model):
 class Trade(Model):
     id = fields.BigIntField(pk=True)
     swap = fields.ForeignKeyField('models.Swap', related_name='trades')
-
+    
+    # Denormalized for high-speed Trust Graph queries
+    token = fields.ForeignKeyField('models.Token', related_name='trades')
+    seller: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField('models.Holder', related_name='sales')
     buyer: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField('models.Holder', related_name='purchases')
+    creator: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField('models.Holder', related_name='creator_sales')
 
     amount = fields.BigIntField()
     price_mutez = fields.BigIntField()
