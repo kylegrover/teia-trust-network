@@ -15,34 +15,34 @@ Notes:
 - The script does not require the sqlite3 CLI; it uses Python's sqlite3 module.
 - Default DBs point to the `db_backups/` names you provided.
 """
+
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import shutil
 import sqlite3
 import statistics
 import tempfile
 import time
+from datetime import UTC
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-
+from typing import Any
 
 DEFAULT_DBS = [
-    "db_backups/teia_ecosystem.sqlite3",
-    "db_backups/teia_ecosystem_backfilled.sqlite3",
-    "db_backups/teia_ecosystem_backup_commit_84825d.sqlite3",
+    'db_backups/teia_ecosystem.sqlite3',
+    'db_backups/teia_ecosystem_backfilled.sqlite3',
+    'db_backups/teia_ecosystem_backup_commit_84825d.sqlite3',
 ]
 
 
 def human(n: int) -> str:
-    for u in ("B", "KB", "MB", "GB"):
+    for u in ('B', 'KB', 'MB', 'GB'):
         if n < 1024.0:
-            return f"{n:3.1f}{u}"
+            return f'{n:3.1f}{u}'
         n /= 1024.0
-    return f"{n:.1f}TB"
+    return f'{n:.1f}TB'
 
 
 def open_conn(path: str) -> sqlite3.Connection:
@@ -52,8 +52,8 @@ def open_conn(path: str) -> sqlite3.Connection:
 
 
 def db_bytes(conn: sqlite3.Connection) -> int:
-    pc = conn.execute("PRAGMA page_count;").fetchone()[0]
-    ps = conn.execute("PRAGMA page_size;").fetchone()[0]
+    pc = conn.execute('PRAGMA page_count;').fetchone()[0]
+    ps = conn.execute('PRAGMA page_size;').fetchone()[0]
     return int(pc) * int(ps)
 
 
@@ -64,36 +64,36 @@ def vacuum_copy(orig_path: Path, overwrite: bool = False) -> Path:
     if overwrite:
         conn = open_conn(str(orig_path))
         try:
-            conn.execute("VACUUM;")
+            conn.execute('VACUUM;')
             conn.commit()
         finally:
             conn.close()
         return orig_path
 
-    tmpdir = Path(tempfile.mkdtemp(prefix="teia_vac_"))
+    tmpdir = Path(tempfile.mkdtemp(prefix='teia_vac_'))
     dst = tmpdir / orig_path.name
     shutil.copy2(orig_path, dst)
     conn = open_conn(str(dst))
     try:
-        conn.execute("VACUUM;")
+        conn.execute('VACUUM;')
         conn.commit()
     finally:
         conn.close()
     return dst
 
 
-def pick_heavy_address(conn: sqlite3.Connection) -> Optional[str]:
+def pick_heavy_address(conn: sqlite3.Connection) -> str | None:
     """Try multiple high-frequency sources to find a heavy address for benchmarking."""
     candidates = [
-        ("swap", "seller_address"),
-        ("trade", "buyer_address"),
-        ("token", "creator_address"),
-        ("trustedge", "buyer_address"),
-        ("trustedge", "seller_address"),
+        ('swap', 'seller_address'),
+        ('trade', 'buyer_address'),
+        ('token', 'creator_address'),
+        ('trustedge', 'buyer_address'),
+        ('trustedge', 'seller_address'),
     ]
     for table, col in candidates:
         try:
-            q = f"SELECT {col} FROM {table} WHERE {col} IS NOT NULL GROUP BY {col} ORDER BY COUNT(*) DESC LIMIT 1;"
+            q = f'SELECT {col} FROM {table} WHERE {col} IS NOT NULL GROUP BY {col} ORDER BY COUNT(*) DESC LIMIT 1;'
             row = conn.execute(q).fetchone()
             if row and row[0]:
                 return row[0]
@@ -102,8 +102,8 @@ def pick_heavy_address(conn: sqlite3.Connection) -> Optional[str]:
     return None
 
 
-def timed_query(conn: sqlite3.Connection, sql: str, params: Tuple = (), runs: int = 5) -> Dict[str, Any]:
-    times: List[float] = []
+def timed_query(conn: sqlite3.Connection, sql: str, params: tuple = (), runs: int = 5) -> dict[str, Any]:
+    times: list[float] = []
     result_count = None
     cur = conn.cursor()
     for _ in range(runs):
@@ -115,17 +115,17 @@ def timed_query(conn: sqlite3.Connection, sql: str, params: Tuple = (), runs: in
         if result_count is None:
             result_count = r[0] if r is not None else None
     return {
-        "runs": runs,
-        "median_s": statistics.median(times) if times else None,
-        "mean_s": statistics.mean(times) if times else None,
-        "min_s": min(times) if times else None,
-        "max_s": max(times) if times else None,
-        "result_count": result_count,
+        'runs': runs,
+        'median_s': statistics.median(times) if times else None,
+        'mean_s': statistics.mean(times) if times else None,
+        'min_s': min(times) if times else None,
+        'max_s': max(times) if times else None,
+        'result_count': result_count,
     }
 
 
-def gather_indexes(conn: sqlite3.Connection, table: str = "swap") -> List[Dict[str, Any]]:
-    out: List[Dict[str, Any]] = []
+def gather_indexes(conn: sqlite3.Connection, table: str = 'swap') -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
     try:
         idxs = conn.execute(f"PRAGMA index_list('{table}');").fetchall()
     except sqlite3.Error:
@@ -133,11 +133,11 @@ def gather_indexes(conn: sqlite3.Connection, table: str = "swap") -> List[Dict[s
     for idx in idxs:
         name = idx[1]
         detail = conn.execute(f"PRAGMA index_info('{name}');").fetchall()
-        out.append({"name": name, "unique": bool(idx[2]), "columns": [d[2] for d in detail]})
+        out.append({'name': name, 'unique': bool(idx[2]), 'columns': [d[2] for d in detail]})
     return out
 
 
-def gather_basic(conn: sqlite3.Connection) -> Dict[str, Any]:
+def gather_basic(conn: sqlite3.Connection) -> dict[str, Any]:
     def safe_one(q: str):
         try:
             return conn.execute(q).fetchone()[0]
@@ -146,41 +146,47 @@ def gather_basic(conn: sqlite3.Connection) -> Dict[str, Any]:
 
     # also capture token/trustedge presence (they commonly hold addresses)
     return {
-        "tables": [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()],
-        "swap_count": safe_one("SELECT count(*) FROM swap"),
-        "trade_count": safe_one("SELECT count(*) FROM trade"),
-        "token_count": safe_one("SELECT count(*) FROM token"),
-        "trustedge_count": safe_one("SELECT count(*) FROM trustedge"),
-        "holder_count": safe_one("SELECT count(*) FROM holder"),
-        "distinct_seller_addresses": safe_one(
-            "SELECT COUNT(DISTINCT seller_address) FROM swap WHERE seller_address IS NOT NULL"
+        'tables': [
+            r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()
+        ],
+        'swap_count': safe_one('SELECT count(*) FROM swap'),
+        'trade_count': safe_one('SELECT count(*) FROM trade'),
+        'token_count': safe_one('SELECT count(*) FROM token'),
+        'trustedge_count': safe_one('SELECT count(*) FROM trustedge'),
+        'holder_count': safe_one('SELECT count(*) FROM holder'),
+        'distinct_seller_addresses': safe_one(
+            'SELECT COUNT(DISTINCT seller_address) FROM swap WHERE seller_address IS NOT NULL'
         ),
-        "swap_missing_seller_id": safe_one("SELECT count(*) FROM swap WHERE seller_id IS NULL"),
-        "avg_seller_address_len": safe_one("SELECT avg(length(seller_address)) FROM swap WHERE seller_address IS NOT NULL"),
-        "freelist_count": safe_one("PRAGMA freelist_count;"),
+        'swap_missing_seller_id': safe_one('SELECT count(*) FROM swap WHERE seller_id IS NULL'),
+        'avg_seller_address_len': safe_one(
+            'SELECT avg(length(seller_address)) FROM swap WHERE seller_address IS NOT NULL'
+        ),
+        'freelist_count': safe_one('PRAGMA freelist_count;'),
     }
 
 
-def gather_for_db(path: Path, do_vacuum: bool = False, overwrite_vacuum: bool = False, address: Optional[str] = None) -> Dict[str, Any]:
+def gather_for_db(
+    path: Path, do_vacuum: bool = False, overwrite_vacuum: bool = False, address: str | None = None
+) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(path)
-    report: Dict[str, Any] = {"path": str(path), "timestamp": datetime.utcnow().isoformat()}
+    report: dict[str, Any] = {'path': str(path), 'timestamp': datetime.utcnow().isoformat()}
 
     working_path = path
     # run VACUUM on a temp copy (unless overwrite requested)
     if do_vacuum:
         vac_path = vacuum_copy(path, overwrite=overwrite_vacuum)
-        report["vacuumed_path"] = str(vac_path)
+        report['vacuumed_path'] = str(vac_path)
         working_path = vac_path
 
     conn = open_conn(str(working_path))
     try:
-        report["bytes"] = db_bytes(conn)
+        report['bytes'] = db_bytes(conn)
         report.update(gather_basic(conn))
-        report["indexes"] = gather_indexes(conn, table="swap")
+        report['indexes'] = gather_indexes(conn, table='swap')
 
         heavy = address or pick_heavy_address(conn)
-        report["heavy_address"] = heavy
+        report['heavy_address'] = heavy
 
         # show schema for the most relevant tables so we can see which columns are populated
         def table_info(t: str):
@@ -189,48 +195,50 @@ def gather_for_db(path: Path, do_vacuum: bool = False, overwrite_vacuum: bool = 
             except sqlite3.Error:
                 return []
 
-        report["table_info_swap"] = table_info('swap')
-        report["table_info_token"] = table_info('token')
+        report['table_info_swap'] = table_info('swap')
+        report['table_info_token'] = table_info('token')
 
         # sample rows for quick inspection (non-exhaustive)
         def sample(t: str, n: int = 3):
             try:
-                return [dict(r) for r in conn.execute(f"SELECT * FROM {t} LIMIT {n}").fetchall()]
+                return [dict(r) for r in conn.execute(f'SELECT * FROM {t} LIMIT {n}').fetchall()]
             except sqlite3.Error:
                 return []
 
-        report["sample_swap"] = sample('swap', 5)
-        report["sample_token"] = sample('token', 5)
-        report["sample_holder"] = sample('holder', 5)
+        report['sample_swap'] = sample('swap', 5)
+        report['sample_token'] = sample('token', 5)
+        report['sample_holder'] = sample('holder', 5)
 
         if heavy:
             # try legacy and interned lookups even if swap may be empty — fallback queries included
-            legacy_sql = "SELECT COUNT(*) FROM swap WHERE seller_address=?"
-            intern_sql = "SELECT COUNT(*) FROM swap WHERE seller_id=(SELECT id FROM holder WHERE address=?)"
-            token_legacy_sql = "SELECT COUNT(*) FROM token WHERE creator_address=?"
+            legacy_sql = 'SELECT COUNT(*) FROM swap WHERE seller_address=?'
+            intern_sql = 'SELECT COUNT(*) FROM swap WHERE seller_id=(SELECT id FROM holder WHERE address=?)'
+            token_legacy_sql = 'SELECT COUNT(*) FROM token WHERE creator_address=?'
 
-            report["bench_legacy"] = timed_query(conn, legacy_sql, (heavy,))
-            report["bench_interned"] = timed_query(conn, intern_sql, (heavy,))
-            report["bench_token_legacy"] = timed_query(conn, token_legacy_sql, (heavy,))
+            report['bench_legacy'] = timed_query(conn, legacy_sql, (heavy,))
+            report['bench_interned'] = timed_query(conn, intern_sql, (heavy,))
+            report['bench_token_legacy'] = timed_query(conn, token_legacy_sql, (heavy,))
 
-            report["explain_legacy"] = conn.execute("EXPLAIN QUERY PLAN SELECT COUNT(*) FROM swap WHERE seller_address=?", (heavy,)).fetchall()
-            report["explain_interned"] = conn.execute(
-                "EXPLAIN QUERY PLAN SELECT COUNT(*) FROM swap WHERE seller_id=(SELECT id FROM holder WHERE address=?)",
+            report['explain_legacy'] = conn.execute(
+                'EXPLAIN QUERY PLAN SELECT COUNT(*) FROM swap WHERE seller_address=?', (heavy,)
+            ).fetchall()
+            report['explain_interned'] = conn.execute(
+                'EXPLAIN QUERY PLAN SELECT COUNT(*) FROM swap WHERE seller_id=(SELECT id FROM holder WHERE address=?)',
                 (heavy,),
             ).fetchall()
-            report["explain_token_legacy"] = conn.execute("EXPLAIN QUERY PLAN SELECT COUNT(*) FROM token WHERE creator_address=?", (heavy,)).fetchall()
+            report['explain_token_legacy'] = conn.execute(
+                'EXPLAIN QUERY PLAN SELECT COUNT(*) FROM token WHERE creator_address=?', (heavy,)
+            ).fetchall()
     finally:
         conn.close()
 
     return report
 
 
-def summary_report(reports: List[Dict[str, Any]]) -> str:
-    lines: List[str] = []
-    lines.append("DB benchmark summary:")
-    header = (
-        f"{'db':36} {'bytes':>10} {'swap':>8} {'token':>8} {'holders':>8} {'distinct_addrs':>13} {'missing_seller_id':>18} {'median_legacy_ms':>15} {'median_intern_ms':>15} {'note':>8}"
-    )
+def summary_report(reports: list[dict[str, Any]]) -> str:
+    lines: list[str] = []
+    lines.append('DB benchmark summary:')
+    header = f'{"db":36} {"bytes":>10} {"swap":>8} {"token":>8} {"holders":>8} {"distinct_addrs":>13} {"missing_seller_id":>18} {"median_legacy_ms":>15} {"median_intern_ms":>15} {"note":>8}'
     lines.append(header)
     lines.append('-' * len(header))
     for r in reports:
@@ -243,8 +251,8 @@ def summary_report(reports: List[Dict[str, Any]]) -> str:
         missing = r.get('swap_missing_seller_id') or 0
         legacy_ms = (r.get('bench_legacy') or {}).get('median_s')
         intern_ms = (r.get('bench_interned') or {}).get('median_s')
-        legacy_ms_s = f"{legacy_ms*1000:6.1f}" if legacy_ms else '  n/a'
-        intern_ms_s = f"{intern_ms*1000:6.1f}" if intern_ms else '  n/a'
+        legacy_ms_s = f'{legacy_ms * 1000:6.1f}' if legacy_ms else '  n/a'
+        intern_ms_s = f'{intern_ms * 1000:6.1f}' if intern_ms else '  n/a'
         # quick heuristic note
         if holders > 0 and swap == 0 and token > 0:
             note = 'holders←token'
@@ -253,34 +261,36 @@ def summary_report(reports: List[Dict[str, Any]]) -> str:
         else:
             note = ''
         lines.append(
-            f"{dbn:36} {bytes_h:>10} {swap:8,d} {token:8,d} {holders:8,d} {distinct:13,d} {missing:18,d} {legacy_ms_s:>15} {intern_ms_s:>15} {note:>8}"
+            f'{dbn:36} {bytes_h:>10} {swap:8,d} {token:8,d} {holders:8,d} {distinct:13,d} {missing:18,d} {legacy_ms_s:>15} {intern_ms_s:>15} {note:>8}'
         )
-    return "\n".join(lines)
+    return '\n'.join(lines)
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("--dbs", nargs='+', default=DEFAULT_DBS, help="Paths to SQLite DB files to benchmark")
-    p.add_argument("--address", help="Address to use for micro-benchmarks (auto-picked if omitted)")
-    p.add_argument("--vacuum", action='store_true', help="Run VACUUM on a temporary copy and report vacuumed size")
-    p.add_argument("--overwrite-vacuum", action='store_true', help="VACUUM the original DB(s) in-place (dangerous)")
-    p.add_argument("--out", help="Write full JSON report to this path")
+    p.add_argument('--dbs', nargs='+', default=DEFAULT_DBS, help='Paths to SQLite DB files to benchmark')
+    p.add_argument('--address', help='Address to use for micro-benchmarks (auto-picked if omitted)')
+    p.add_argument('--vacuum', action='store_true', help='Run VACUUM on a temporary copy and report vacuumed size')
+    p.add_argument('--overwrite-vacuum', action='store_true', help='VACUUM the original DB(s) in-place (dangerous)')
+    p.add_argument('--out', help='Write full JSON report to this path')
     args = p.parse_args(argv)
 
-    reports: List[Dict[str, Any]] = []
+    reports: list[dict[str, Any]] = []
     for db in args.dbs:
         path = Path(db)
         try:
-            rep = gather_for_db(path, do_vacuum=args.vacuum, overwrite_vacuum=args.overwrite_vacuum, address=args.address)
+            rep = gather_for_db(
+                path, do_vacuum=args.vacuum, overwrite_vacuum=args.overwrite_vacuum, address=args.address
+            )
             reports.append(rep)
         except Exception as e:
-            reports.append({"path": str(path), "error": str(e)})
+            reports.append({'path': str(path), 'error': str(e)})
 
     print(summary_report(reports))
-    out = args.out or f"bench_report-{int(time.time())}.json"
-    with open(out, 'w', encoding='utf-8') as fh:
-        json.dump({"generated_at": datetime.utcnow().isoformat(), "reports": reports}, fh, indent=2, default=str)
-    print(f"\nFull JSON report written to: {out}")
+    out = Path(args.out) if args.out else Path(f'bench_report-{int(time.time())}.json')
+    with out.open('w', encoding='utf-8') as fh:
+        json.dump({'generated_at': datetime.now(UTC).isoformat(), 'reports': reports}, fh, indent=2, default=str)
+    print(f'\nFull JSON report written to: {out}')
     return 0
 
 

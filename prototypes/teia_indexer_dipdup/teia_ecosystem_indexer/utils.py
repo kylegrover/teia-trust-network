@@ -5,16 +5,15 @@
 
 Keep helpers minimal and defensive so they can be applied repo-wide without risk.
 """
+
 from __future__ import annotations
 
-from typing import Any, Optional
-
-from dipdup import fields
+from typing import Any
 
 from teia_ecosystem_indexer import models
 
 
-async def resolve_holder_async(value: Any) -> Optional[models.Holder]:
+async def resolve_holder_async(value: Any) -> models.Holder | None:
     """Return a Holder from an id or address or model instance (or None)."""
     if value is None:
         return None
@@ -30,7 +29,7 @@ async def resolve_holder_async(value: Any) -> Optional[models.Holder]:
     return None
 
 
-async def resolve_address_async(obj: Any, fk_attr: str, legacy_attr: str) -> Optional[str]:
+async def resolve_address_async(obj: Any, fk_attr: str, legacy_attr: str) -> str | None:
     """Resolve an address for a model instance.
 
     Strategy (defensive):
@@ -43,7 +42,7 @@ async def resolve_address_async(obj: Any, fk_attr: str, legacy_attr: str) -> Opt
     fk = getattr(obj, fk_attr, None)
     # If fk is a model instance with 'address', prefer it
     if fk is not None and hasattr(fk, 'address'):
-        return getattr(fk, 'address')
+        return fk.address
     # If fk is an int (stored PK), fetch Holder
     if isinstance(fk, int):
         holder = await models.Holder.get_or_none(id=fk)
@@ -52,5 +51,4 @@ async def resolve_address_async(obj: Any, fk_attr: str, legacy_attr: str) -> Opt
     if isinstance(fk, str):
         return fk
     # 2) fallback to legacy string column (no extra DB hits)
-    legacy = getattr(obj, legacy_attr, None)
-    return legacy
+    return getattr(obj, legacy_attr, None)

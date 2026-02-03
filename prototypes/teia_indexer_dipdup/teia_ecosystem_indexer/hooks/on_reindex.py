@@ -1,6 +1,7 @@
-from dipdup.context import HookContext
-from pathlib import Path
 import os
+from pathlib import Path
+
+from dipdup.context import HookContext
 
 
 async def on_reindex(

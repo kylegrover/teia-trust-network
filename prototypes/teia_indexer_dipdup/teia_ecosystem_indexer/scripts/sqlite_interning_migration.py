@@ -31,22 +31,24 @@ Recommended workflow
 4. When confident, run with --inplace during a maintenance window.
 
 """
+
 from __future__ import annotations
 
 import argparse
 import json
-import os
-import re
 import shutil
 import sqlite3
-import stat
-import subprocess
 import sys
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import UTC
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING
+from typing import Any
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 LEGACY_COLUMNS = {
     'token': ['creator_address'],
@@ -59,7 +61,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 def now_iso() -> str:
     # use timezone-aware UTC to avoid DeprecationWarning on Python 3.12+
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def open_conn(path: Path) -> sqlite3.Connection:
@@ -79,10 +81,10 @@ def vacuum_inplace(path: Path) -> None:
     execute VACUUM, commit and close. Keep the implementation local to avoid
     adding new module deps.
     """
-    conn: Optional[sqlite3.Connection] = None
+    conn: sqlite3.Connection | None = None
     try:
         conn = open_conn(path)
-        conn.execute("VACUUM;")
+        conn.execute('VACUUM;')
         conn.commit()
     finally:
         if conn is not None:
@@ -101,21 +103,23 @@ def pragma_bytes(conn: sqlite3.Connection) -> int:
         return 0
 
 
-def list_tables(conn: sqlite3.Connection) -> List[str]:
+def list_tables(conn: sqlite3.Connection) -> list[str]:
     try:
-        return [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()]
+        return [
+            r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()
+        ]
     except Exception:
         return []
 
 
-def table_columns(conn: sqlite3.Connection, table: str) -> List[str]:
+def table_columns(conn: sqlite3.Connection, table: str) -> list[str]:
     try:
         return [r['name'] for r in conn.execute(f"PRAGMA table_info('{table}')").fetchall()]
     except Exception:
         return []
 
 
-def run_counts(conn: sqlite3.Connection) -> Dict[str, Any]:
+def run_counts(conn: sqlite3.Connection) -> dict[str, Any]:
     def s(q: str):
         try:
             return conn.execute(q).fetchone()[0]
@@ -124,7 +128,9 @@ def run_counts(conn: sqlite3.Connection) -> Dict[str, Any]:
 
     return {
         'token_count': s('SELECT count(*) FROM token'),
-        'distinct_token_creators': s("SELECT COUNT(DISTINCT creator_address) FROM token WHERE creator_address IS NOT NULL"),
+        'distinct_token_creators': s(
+            'SELECT COUNT(DISTINCT creator_address) FROM token WHERE creator_address IS NOT NULL'
+        ),
         'token_creator_id_populated': s('SELECT count(*) FROM token WHERE creator_id IS NOT NULL'),
         'token_join_holder': s('SELECT count(*) FROM token t JOIN holder h ON h.address = t.creator_address'),
         'swap_count': s('SELECT count(*) FROM swap'),
@@ -134,10 +140,12 @@ def run_counts(conn: sqlite3.Connection) -> Dict[str, Any]:
     }
 
 
-def pick_sample_address(conn: sqlite3.Connection) -> Optional[str]:
+def pick_sample_address(conn: sqlite3.Connection) -> str | None:
     # prefer token creators
     try:
-        r = conn.execute("SELECT creator_address FROM token WHERE creator_address IS NOT NULL GROUP BY creator_address ORDER BY COUNT(*) DESC LIMIT 1").fetchone()
+        r = conn.execute(
+            'SELECT creator_address FROM token WHERE creator_address IS NOT NULL GROUP BY creator_address ORDER BY COUNT(*) DESC LIMIT 1'
+        ).fetchone()
         if r:
             return r[0]
     except Exception:
@@ -145,8 +153,8 @@ def pick_sample_address(conn: sqlite3.Connection) -> Optional[str]:
     return None
 
 
-def timed_query(conn: sqlite3.Connection, sql: str, params: Tuple = (), runs: int = 5) -> Dict[str, Any]:
-    times: List[float] = []
+def timed_query(conn: sqlite3.Connection, sql: str, params: tuple = (), runs: int = 5) -> dict[str, Any]:
+    times: list[float] = []
     result = None
     cur = conn.cursor()
     for _ in range(runs):
@@ -166,8 +174,8 @@ def timed_query(conn: sqlite3.Connection, sql: str, params: Tuple = (), runs: in
     }
 
 
-def repo_search_legacy(root: Path, patterns: Iterable[str]) -> Dict[str, List[str]]:
-    out: Dict[str, List[str]] = {p: [] for p in patterns}
+def repo_search_legacy(root: Path, patterns: Iterable[str]) -> dict[str, list[str]]:
+    out: dict[str, list[str]] = {p: [] for p in patterns}
     # scan common text files (.py, .md, .sql, .yaml, .yml, .sh)
     exts = ('.py', '.md', '.sql', '.yaml', '.yml', '.sh', '.json', '.ini', '.toml')
     for p in root.rglob('*'):
@@ -182,7 +190,7 @@ def repo_search_legacy(root: Path, patterns: Iterable[str]) -> Dict[str, List[st
     return out
 
 
-def create_table_without_columns(conn: sqlite3.Connection, table: str, drop_cols: List[str]) -> None:
+def create_table_without_columns(conn: sqlite3.Connection, table: str, drop_cols: list[str]) -> None:
     cols = [c['name'] for c in conn.execute(f"PRAGMA table_info('{table}')").fetchall()]
     keep = [c for c in cols if c not in drop_cols]
     if not keep:
@@ -190,9 +198,9 @@ def create_table_without_columns(conn: sqlite3.Connection, table: str, drop_cols
     col_list = ', '.join(keep)
     conn.execute('PRAGMA foreign_keys=OFF;')
     conn.execute('BEGIN;')
-    conn.execute(f"CREATE TABLE {table}_new AS SELECT {col_list} FROM {table};")
-    conn.execute(f"DROP TABLE {table};")
-    conn.execute(f"ALTER TABLE {table}_new RENAME TO {table};")
+    conn.execute(f'CREATE TABLE {table}_new AS SELECT {col_list} FROM {table};')
+    conn.execute(f'DROP TABLE {table};')
+    conn.execute(f'ALTER TABLE {table}_new RENAME TO {table};')
     conn.execute('COMMIT;')
     conn.execute('PRAGMA foreign_keys=ON;')
 
@@ -207,28 +215,27 @@ def ensure_index(conn: sqlite3.Connection, table: str, index_sql: str) -> None:
 
 def validate_post_swap(conn: sqlite3.Connection, table: str, expected_count: int) -> bool:
     try:
-        cnt = conn.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
+        cnt = conn.execute(f'SELECT count(*) FROM {table}').fetchone()[0]
         return cnt == expected_count
     except Exception:
         return False
 
 
-def human(n: Optional[int]) -> str:
+def human(n: int | None) -> str:
     if not n:
         return '0'
     for u in ('B', 'KiB', 'MiB', 'GiB'):
         if abs(n) < 1024.0:
-            return f"{n:3.1f}{u}"
+            return f'{n:3.1f}{u}'
         n /= 1024.0
-    return f"{n:.1f}TiB"
+    return f'{n:.1f}TiB'
 
 
-def perform_migration(src: Path, workdir: Path, drop_tables: List[str], inplace: bool = False, vacuum: bool = True) -> Dict[str, Any]:
-    report: Dict[str, Any] = {'started_at': now_iso(), 'src': str(src), 'workdir': str(workdir)}
+def perform_migration(
+    src: Path, workdir: Path, drop_tables: list[str], inplace: bool = False, vacuum: bool = True
+) -> dict[str, Any]:
+    report: dict[str, Any] = {'started_at': now_iso(), 'src': str(src), 'workdir': str(workdir)}
     # create working copies
-    if inplace:
-        if not (args_yes := False):
-            pass
     baseline = workdir / (src.stem + '.baseline.sqlite3')
     trial = workdir / (src.stem + '.trial.sqlite3')
     shutil.copy2(src, baseline)
@@ -252,7 +259,7 @@ def perform_migration(src: Path, workdir: Path, drop_tables: List[str], inplace:
     report['repo_legacy_refs'] = repo_search_legacy(REPO_ROOT, patterns)
 
     # safety checks
-    issues: List[str] = []
+    issues: list[str] = []
     if pre['counts'].get('token_creator_id_populated') != pre['counts'].get('token_count'):
         issues.append('token.creator_id is not fully populated — abort or backfill first')
     report['pre_checks_issues'] = issues
@@ -311,9 +318,15 @@ def perform_migration(src: Path, workdir: Path, drop_tables: List[str], inplace:
         addr = pick_sample_address(conn_b2)
         post['heavy_address'] = addr
         if addr:
-            post['baseline']['bench_token_legacy'] = timed_query(conn_b2, 'SELECT COUNT(*) FROM token WHERE creator_address=?', (addr,))
-            post['baseline']['bench_token_interned'] = timed_query(conn_b2, 'SELECT COUNT(*) FROM token WHERE creator_id=(SELECT id FROM holder WHERE address=?)', (addr,))
-            post['trial']['bench_token_interned'] = timed_query(conn_t2, 'SELECT COUNT(*) FROM token WHERE creator_id=(SELECT id FROM holder WHERE address=?)', (addr,))
+            post['baseline']['bench_token_legacy'] = timed_query(
+                conn_b2, 'SELECT COUNT(*) FROM token WHERE creator_address=?', (addr,)
+            )
+            post['baseline']['bench_token_interned'] = timed_query(
+                conn_b2, 'SELECT COUNT(*) FROM token WHERE creator_id=(SELECT id FROM holder WHERE address=?)', (addr,)
+            )
+            post['trial']['bench_token_interned'] = timed_query(
+                conn_t2, 'SELECT COUNT(*) FROM token WHERE creator_id=(SELECT id FROM holder WHERE address=?)', (addr,)
+            )
     finally:
         conn_b2.close()
         conn_t2.close()
@@ -324,7 +337,7 @@ def perform_migration(src: Path, workdir: Path, drop_tables: List[str], inplace:
     report['interpretation'] = {
         'delta_bytes': delta,
         'delta_percent': (delta / post['baseline']['file_bytes'] * 100) if post['baseline']['file_bytes'] else None,
-        'advice': []
+        'advice': [],
     }
     if delta > 5 * 1024 * 1024:
         report['interpretation']['advice'].append('MEASURABLE_SAVING')
@@ -335,22 +348,22 @@ def perform_migration(src: Path, workdir: Path, drop_tables: List[str], inplace:
     return report
 
 
-def write_report(out: Dict[str, Any], workdir: Path) -> Path:
-    path = workdir / f'interning_migration_report-{now_iso().replace(":","-")}.json'
+def write_report(out: dict[str, Any], workdir: Path) -> Path:
+    path = workdir / f'interning_migration_report-{now_iso().replace(":", "-")}.json'
     path.write_text(json.dumps(out, indent=2, default=str), encoding='utf-8')
     return path
 
 
-def human_summary(report: Dict[str, Any]) -> str:
+def human_summary(report: dict[str, Any]) -> str:
     b = report['pre']['file_bytes']
     t = report['post']['trial']['file_bytes']
     delta = b - t
     pct = (delta / b * 100) if b else 0
     lines = []
-    lines.append(f"Source: {report['src']}")
-    lines.append(f"Baseline size: {human(b)}")
-    lines.append(f"Trial size:    {human(t)}")
-    lines.append(f"Delta:         {human(delta)} ({pct:.1f}%)")
+    lines.append(f'Source: {report["src"]}')
+    lines.append(f'Baseline size: {human(b)}')
+    lines.append(f'Trial size:    {human(t)}')
+    lines.append(f'Delta:         {human(delta)} ({pct:.1f}%)')
     lines.append('Pre-check issues:')
     if report.get('pre_checks_issues'):
         for i in report['pre_checks_issues']:
@@ -366,15 +379,23 @@ def human_summary(report: Dict[str, Any]) -> str:
     if 'MEASURABLE_SAVING' in report['interpretation'].get('advice', []):
         lines.append(' - Proceed to staging migration; schedule prod migration with backups and 48-72h monitoring.')
     else:
-        lines.append(' - No strong disk benefit observed; consider targeting other high-cardinality columns or run cold reindex for full comparison.')
+        lines.append(
+            ' - No strong disk benefit observed; consider targeting other high-cardinality columns or run cold reindex for full comparison.'
+        )
     return '\n'.join(lines)
 
 
-def parse_args(argv: Optional[Iterable[str]] = None):
+def parse_args(argv: Iterable[str] | None = None):
     p = argparse.ArgumentParser(description='SQLite interning migration helper (safe by default)')
     p.add_argument('--src', required=True, help='Source SQLite DB file (use a backup copy)')
     p.add_argument('--work-dir', default=None, help='Directory to store copies and report (default: temp)')
-    p.add_argument('--do-drop', nargs='+', choices=['token', 'swap', 'trade'], default=['token'], help='Which legacy columns/tables to drop')
+    p.add_argument(
+        '--do-drop',
+        nargs='+',
+        choices=['token', 'swap', 'trade'],
+        default=['token'],
+        help='Which legacy columns/tables to drop',
+    )
     p.add_argument('--vacuum', action='store_true', help='VACUUM copies before measuring')
     p.add_argument('--bench', action='store_true', help='Run microbenchmarks (timed queries)')
     p.add_argument('--inplace', action='store_true', help='Apply migration IN-PLACE to source DB (DANGEROUS)')
@@ -391,7 +412,11 @@ if __name__ == '__main__':
     if args.inplace and not args.yes_ireally_mean_it:
         print('Refusing to run inplace migration without --yes-ireally-mean-it')
         raise SystemExit(2)
-    workdir = Path(args.work_dir).expanduser().resolve() if args.work_dir else Path(tempfile.mkdtemp(prefix='teia_intern_trial_'))
+    workdir = (
+        Path(args.work_dir).expanduser().resolve()
+        if args.work_dir
+        else Path(tempfile.mkdtemp(prefix='teia_intern_trial_'))
+    )
     workdir.mkdir(parents=True, exist_ok=True)
 
     print('Running safe intern/cleanup trial')
@@ -402,11 +427,15 @@ if __name__ == '__main__':
     print(' Bench:', args.bench)
     print(' In-place:', args.inplace)
 
-    rpt = perform_migration(src=src, workdir=workdir, drop_tables=args.do_drop, inplace=args.inplace, vacuum=args.vacuum)
+    rpt = perform_migration(
+        src=src, workdir=workdir, drop_tables=args.do_drop, inplace=args.inplace, vacuum=args.vacuum
+    )
     out_path = write_report(rpt, workdir)
 
     print('\n' + '=' * 72)
     print(human_summary(rpt))
     print('\nFull report JSON ->', out_path)
-    print('\nIf results look good, run the same process on staging and then schedule production migration (keep backups).')
+    print(
+        '\nIf results look good, run the same process on staging and then schedule production migration (keep backups).'
+    )
     sys.exit(0)

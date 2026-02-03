@@ -11,11 +11,9 @@ async def on_collect_v2(
     collect: TezosTransaction[CollectParameter, HenMarketV2Storage],
 ) -> None:
     # 1. Resolve Swap
-    swap_id = int(collect.parameter.__root__)
-    swap = await models.Swap.get_or_none(
-        swap_id=swap_id, 
-        contract_address=collect.data.target_address
-    )
+    # RootModel uses .root in Pydantic v2
+    swap_id = int(collect.parameter.root)
+    swap = await models.Swap.get_or_none(swap_id=swap_id, contract_address=collect.data.target_address)
     if not swap:
         return
 
@@ -37,4 +35,3 @@ async def on_collect_v2(
         price_mutez=swap.price_mutez,
         timestamp=collect.data.timestamp,
     )
-

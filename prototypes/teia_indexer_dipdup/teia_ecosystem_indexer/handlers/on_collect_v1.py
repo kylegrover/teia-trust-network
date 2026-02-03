@@ -12,10 +12,7 @@ async def on_collect_v1(
 ) -> None:
     # 1. Resolve Swap
     swap_id = int(collect.parameter.swap_id)
-    swap = await models.Swap.get_or_none(
-        swap_id=swap_id, 
-        contract_address=collect.data.target_address
-    )
+    swap = await models.Swap.get_or_none(swap_id=swap_id, contract_address=collect.data.target_address)
     if not swap:
         return
 
@@ -37,4 +34,3 @@ async def on_collect_v1(
         price_mutez=swap.price_mutez,
         timestamp=collect.data.timestamp,
     )
-

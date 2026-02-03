@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 import pytest
 
 from teia_ecosystem_indexer.utils import resolve_address_async

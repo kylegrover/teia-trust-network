@@ -25,10 +25,8 @@ class Token(Model):
     id = fields.BigIntField(pk=True)
     contract = fields.CharField(max_length=36, index=True)
     token_id = fields.BigIntField(index=True)
-    
-    creator: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField(
-        'models.Holder', related_name='tokens'
-    )
+
+    creator: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField('models.Holder', related_name='tokens')
     creator_address = fields.CharField(max_length=36, index=True)
 
     supply = fields.BigIntField()
@@ -44,20 +42,21 @@ class TokenMetadata(Model):
     """Sidecar table for heavy IPFS data.
     Keeping this separate ensures 'Token' table scans remain blindingly fast.
     """
+
     token = fields.OneToOneField('models.Token', pk=True, related_name='metadata_sidecar')
-    
+
     # Store the raw JSON once
     content = fields.JSONField(null=True)
-    
+
     # Extract searchable fields for indexing
     name = fields.TextField(null=True, index=True)
     description = fields.TextField(null=True)
     # Store 'image' or 'artifact' URI explicitly for UI display without parsing JSON
     display_uri = fields.TextField(null=True)
-    
+
     # Optional: If you want Full Text Search, we can add triggers later.
     class Meta:
-        table = "token_metadata"
+        table = 'token_metadata'
 
 
 class Swap(Model):
@@ -70,7 +69,7 @@ class Swap(Model):
     # Hybrid Identity
     seller: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField('models.Holder', related_name='swaps')
     seller_address = fields.CharField(max_length=36, index=True)
-    
+
     token = fields.ForeignKeyField('models.Token', related_name='swaps')
 
     amount_initial = fields.BigIntField()
@@ -88,11 +87,9 @@ class Swap(Model):
 class Trade(Model):
     id = fields.BigIntField(pk=True)
     swap = fields.ForeignKeyField('models.Swap', related_name='trades')
-    
+
     # Hybrid Identity
-    buyer: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField(
-        'models.Holder', related_name='purchases'
-    )
+    buyer: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField('models.Holder', related_name='purchases')
     buyer_address = fields.CharField(max_length=36, index=True)
 
     amount = fields.BigIntField()
@@ -103,19 +100,18 @@ class Trade(Model):
 class Transfer(Model):
     id = fields.BigIntField(pk=True)
     token = fields.ForeignKeyField('models.Token', related_name='transfers')
-    
+
     # Hybrid Identity for sender and receiver
     from_holder: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField(
         'models.Holder', related_name='transfers_sent'
     )
     from_address = fields.CharField(max_length=36, index=True)
-    
+
     to_holder: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField(
         'models.Holder', related_name='transfers_received'
     )
     to_address = fields.CharField(max_length=36, index=True)
-    
+
     amount = fields.BigIntField()
     timestamp = fields.DatetimeField(index=True)
     level = fields.IntField()
-
