@@ -152,6 +152,10 @@ indexes:
         pattern:
           - destination: hen_subjkts
             entrypoint: registry
+      - callback: on_subjkt_unregister
+        pattern:
+          - destination: hen_subjkts
+            entrypoint: unregistry
 
 # Hook to fetch IPFS metadata asynchronously
 hooks:

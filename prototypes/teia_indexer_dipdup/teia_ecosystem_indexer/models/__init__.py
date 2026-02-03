@@ -28,8 +28,27 @@ class Holder(Model):
     id = fields.IntField(pk=True)
     address = fields.CharField(max_length=36, unique=True)
     name = fields.TextField(null=True, index=True)
+    
+    metadata_uri = fields.TextField(null=True)
+    metadata_synced = fields.BooleanField(default=False, index=True)
+
     first_seen = fields.DatetimeField(null=True)
     last_seen = fields.DatetimeField(null=True)
+
+
+class HolderMetadata(Model):
+    """Sidecar table for User Profiles (Bios, Avatars, etc)."""
+
+    holder = fields.OneToOneField('models.Holder', pk=True, related_name='metadata_sidecar')
+
+    # Raw JSON and extracted fields
+    content = fields.JSONField(null=True)
+    bio = fields.TextField(null=True)
+    alias = fields.TextField(null=True)
+    logo = fields.TextField(null=True)  # Avatar URI
+
+    class Meta:
+        table = 'holder_metadata'
 
 
 class Token(Model):

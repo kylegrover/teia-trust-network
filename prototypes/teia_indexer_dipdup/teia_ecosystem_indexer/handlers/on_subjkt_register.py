@@ -11,28 +11,41 @@ async def on_subjkt_register(
     ctx: HandlerContext,
     registry: TezosTransaction[RegistryParameter, HenSubjktsStorage],
 ) -> None:
-    # 1. Decode subjkts name (it's in 'metadata', 'subjkt' is the IPFS link)
-    name_raw = registry.parameter.metadata
-    profile_raw = registry.parameter.subjkt
+    # 1. Decode subjkts name/metadata
+    field_a = registry.parameter.metadata
+    field_b = registry.parameter.subjkt
     
     def _clean_hex(val: str) -> str:
         try:
-            # Try to convert hex to string if it looks like hex
             if len(val) > 0 and all(c in '0123456789abcdefABCDEF' for c in val):
                 return bytes.fromhex(val).decode('utf-8', errors='ignore')
             return val
         except Exception:
             return val
 
-    name = _clean_hex(name_raw)
-    profile_uri = _clean_hex(profile_raw)
+    val_a = _clean_hex(field_a)
+    val_b = _clean_hex(field_b)
 
-    # 2. Update Holder
+    # 2. Logic to distinguish Handle from IPFS URI
+    # Typically metadata = name and subjkt = ipfs, but it can be reversed 
+    # depending on the wallet/app used to register.
+    name = None
+    uri = None
+
+    for v in [val_a, val_b]:
+        if v.startswith('ipfs://') or v.startswith('Qm'):
+            uri = v if v.startswith('ipfs://') else f'ipfs://{v}'
+        elif v and not name:
+            name = v
+
+    # 3. Update Holder
     holder = await utils.get_holder(registry.data.sender_address, registry.data.timestamp)
     
-    # Store the cleaned name
     holder.name = name
-    # We might want to store profile_uri in the future, for now we log it
+    if uri:
+        holder.metadata_uri = uri
+        holder.metadata_synced = False
+    
     await holder.save()
 
-    ctx.logger.info(f"Registered subjkt: {name} profile: {profile_uri} for {registry.data.sender_address}")
+    ctx.logger.info(f"Registered subjkt: {name} URI: {uri} for {registry.data.sender_address}")
