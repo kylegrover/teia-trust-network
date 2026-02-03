@@ -102,16 +102,14 @@ class Transfer(Model):
     id = fields.BigIntField(pk=True)
     token = fields.ForeignKeyField('models.Token', related_name='transfers')
 
-    # Hybrid Identity for sender and receiver
+    # Identifiers (ForeignKeys to Holder table)
+    # Using only FKs saves ~1.5GB of space on 10M+ transfers by removing redundant address strings
     from_holder: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField(
         'models.Holder', related_name='transfers_sent'
     )
-    from_address = fields.CharField(max_length=36, index=True)
-
     to_holder: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField(
         'models.Holder', related_name='transfers_received'
     )
-    to_address = fields.CharField(max_length=36, index=True)
 
     amount = fields.BigIntField()
     timestamp = fields.DatetimeField(index=True)

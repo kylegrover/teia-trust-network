@@ -37,9 +37,7 @@ async def on_transfer(
             await models.Transfer.create(
                 token=token,
                 from_holder=from_holder,
-                from_address=from_address,
                 to_holder=to_holder,
-                to_address=to_address,
                 amount=amount,
                 timestamp=transfer.data.timestamp,
                 level=transfer.data.level,

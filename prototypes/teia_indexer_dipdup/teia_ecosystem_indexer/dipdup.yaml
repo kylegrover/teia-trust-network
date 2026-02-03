@@ -150,3 +150,9 @@ hooks:
   fetch_metadata:
     callback: fetch_metadata
     atomic: False
+
+# Background jobs
+jobs:
+  metadata_sync:
+    hook: fetch_metadata
+    interval: 300

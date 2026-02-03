@@ -11,6 +11,7 @@ async def on_swap_v1(
     ctx: HandlerContext,
     swap: TezosTransaction[SwapParameter, HenMinterV1Storage],
 ) -> None:
+    ctx.logger.info(f"on_swap_v1 called for level {swap.data.level}")
     swap_id = None
     if swap.data.diffs:
         for diff in swap.data.diffs:

@@ -27,3 +27,6 @@ async def on_mint(
         metadata_synced=False,
         timestamp=transaction.data.timestamp,
     )
+
+    # Fire the metadata fetcher hook for this new token
+    await ctx.fire_hook('fetch_metadata')
