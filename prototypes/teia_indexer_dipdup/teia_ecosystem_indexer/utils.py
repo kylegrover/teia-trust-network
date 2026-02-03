@@ -16,10 +16,25 @@ from teia_ecosystem_indexer import models
 if TYPE_CHECKING:
     from datetime import datetime
 
-# High-speed memory cache for Holder identities to skip heavy DB IO during deep sync
+# High-speed memory cache for identities to skip heavy DB IO during deep sync
 _HOLDER_CACHE: dict[str, models.Holder] = {}
 _TOKEN_CACHE: dict[str, models.Token] = {}
+_CONTRACT_CACHE: dict[str, models.Contract] = {}
 _MAX_CACHE_SIZE = 100000
+
+
+async def get_contract(address: str, typename: str | None = None) -> models.Contract:
+    """Fetch contract from memory cache or DB, ensuring it exists."""
+    contract = _CONTRACT_CACHE.get(address)
+    if not contract:
+        contract, _ = await models.Contract.get_or_create(
+            address=address,
+            defaults={'typename': typename}
+        )
+        if len(_CONTRACT_CACHE) > _MAX_CACHE_SIZE:
+            _CONTRACT_CACHE.pop(next(iter(_CONTRACT_CACHE)))
+        _CONTRACT_CACHE[address] = contract
+    return contract
 
 
 async def get_holder(address: str, timestamp: datetime | None = None) -> models.Holder:
@@ -55,12 +70,13 @@ async def get_holder(address: str, timestamp: datetime | None = None) -> models.
     return holder
 
 
-async def get_token(contract: str, token_id: int) -> models.Token | None:
+async def get_token(contract_address: str, token_id: int) -> models.Token | None:
     """Fetch token from memory cache or DB."""
-    cache_key = f'{contract}:{token_id}'
+    cache_key = f'{contract_address}:{token_id}'
     if cache_key in _TOKEN_CACHE:
         return _TOKEN_CACHE[cache_key]
 
+    contract = await get_contract(contract_address)
     token = await models.Token.get_or_none(contract=contract, token_id=token_id)
     if token:
         if len(_TOKEN_CACHE) > _MAX_CACHE_SIZE:

@@ -13,7 +13,8 @@ async def on_collect_v1(
 ) -> None:
     # 1. Resolve Swap
     swap_id = int(collect.parameter.swap_id)
-    swap = await models.Swap.get_or_none(swap_id=swap_id, contract_address=collect.data.target_address)
+    contract = await utils.get_contract(collect.data.target_address, 'hen_minter_v1')
+    swap = await models.Swap.get_or_none(swap_id=swap_id, contract=contract)
     if not swap:
         return
 
@@ -24,14 +25,14 @@ async def on_collect_v1(
         swap.status = 'finished'
     await swap.save()
 
-    # 3. Record the Trade (Hybrid Identity)
+    # 3. Record the Trade
     buyer_holder = await utils.get_holder(collect.data.sender_address)
 
     await models.Trade.create(
         swap=swap,
         buyer=buyer_holder,
-        buyer_address=collect.data.sender_address,
         amount=amount_collected,
         price_mutez=swap.price_mutez,
         timestamp=collect.data.timestamp,
     )
+    ctx.logger.info(f"  [V1] Trade created for swap {swap_id}")

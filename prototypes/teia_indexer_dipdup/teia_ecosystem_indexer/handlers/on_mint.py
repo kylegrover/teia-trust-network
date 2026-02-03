@@ -14,14 +14,14 @@ async def on_mint(
     metadata_hex = transaction.parameter.token_info.get('')
     metadata_uri = bytes.fromhex(metadata_hex).decode('utf-8') if metadata_hex else None
 
-    # Ensure the canonical identity exists
+    # Ensure the canonical identity and contract exist
     creator_holder = await utils.get_holder(transaction.parameter.address)
+    contract = await utils.get_contract(transaction.data.target_address, 'hen_objkts')
 
     await models.Token.create(
-        contract=transaction.data.target_address,
+        contract=contract,
         token_id=transaction.parameter.token_id,
         creator=creator_holder,
-        creator_address=transaction.parameter.address,
         supply=transaction.parameter.amount,
         metadata_uri=metadata_uri,
         metadata_synced=False,

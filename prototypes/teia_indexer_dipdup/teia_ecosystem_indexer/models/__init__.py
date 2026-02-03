@@ -10,6 +10,16 @@ class MarketVersion(str, Enum):
     TEIA = 'teia'
 
 
+class Contract(Model):
+    """Canonical contract registry.
+    Saves massive space by storing KT1... addresses once.
+    """
+
+    id = fields.IntField(pk=True)
+    address = fields.CharField(max_length=36, unique=True)
+    typename = fields.CharField(max_length=50, null=True)
+
+
 class Holder(Model):
     """Canonical identity registry (address is stored ONCE).
     Small and efficient: keeps the hot index compact (INT PK, unique address).
@@ -24,11 +34,10 @@ class Holder(Model):
 
 class Token(Model):
     id = fields.BigIntField(pk=True)
-    contract = fields.CharField(max_length=36, index=True)
+    contract: fields.ForeignKeyField['Contract'] = fields.ForeignKeyField('models.Contract', related_name='tokens')
     token_id = fields.BigIntField(index=True)
 
     creator: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField('models.Holder', related_name='tokens')
-    creator_address = fields.CharField(max_length=36, index=True)
 
     supply = fields.BigIntField()
     metadata_uri = fields.TextField(null=True)
@@ -64,12 +73,10 @@ class Swap(Model):
     id = fields.BigIntField(pk=True)
     # The ID inside the smart contract storage
     swap_id = fields.BigIntField(index=True)
-    contract_address = fields.CharField(max_length=36, index=True)
+    contract: fields.ForeignKeyField['Contract'] = fields.ForeignKeyField('models.Contract', related_name='swaps')
     market_version = fields.EnumField(MarketVersion, index=True)
 
-    # Hybrid Identity
     seller: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField('models.Holder', related_name='swaps')
-    seller_address = fields.CharField(max_length=36, index=True)
 
     token = fields.ForeignKeyField('models.Token', related_name='swaps')
 
@@ -82,16 +89,14 @@ class Swap(Model):
     timestamp = fields.DatetimeField()
 
     class Meta:
-        unique_together = ('contract_address', 'swap_id')
+        unique_together = ('contract', 'swap_id')
 
 
 class Trade(Model):
     id = fields.BigIntField(pk=True)
     swap = fields.ForeignKeyField('models.Swap', related_name='trades')
 
-    # Hybrid Identity
     buyer: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField('models.Holder', related_name='purchases')
-    buyer_address = fields.CharField(max_length=36, index=True)
 
     amount = fields.BigIntField()
     price_mutez = fields.BigIntField()

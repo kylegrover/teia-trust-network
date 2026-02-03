@@ -43,16 +43,15 @@ async def on_collect_teia(
     swap_id = _normalize_swap_id(transaction.parameter)
 
     if swap_id is None:
-        # If we couldn't resolve a numeric swap id, bail out safely (avoid passing objects to ORM)
         return
 
+    contract = await utils.get_contract(transaction.data.target_address, 'teia_market')
     swap = await models.Swap.filter(
         swap_id=swap_id,
-        contract_address=transaction.data.target_address,
+        contract=contract,
     ).get_or_none()
 
     if not swap:
-        # It's possible we missed the swap if it happened before we started indexing
         return
 
     # In Teia/HEN, collect usually implies 1 item unless batching (which isn't this entrypoint)
@@ -68,8 +67,8 @@ async def on_collect_teia(
     await models.Trade.create(
         swap=swap,
         buyer=buyer_holder,
-        buyer_address=transaction.data.sender_address,
         amount=amount_collected,
         price_mutez=swap.price_mutez,
         timestamp=transaction.data.timestamp,
     )
+    ctx.logger.info(f"  [Teia] Trade created for swap {swap_id}")

@@ -9,36 +9,29 @@ async def on_swap_teia(
     ctx: HandlerContext,
     transaction: TezosTransaction,
 ) -> None:
-    # 1. Parse Swap ID from BigMap diffs
     swap_id = None
-    if transaction.data.diffs:
-        for diff in transaction.data.diffs:
-            # Support both dict-style diffs (RPC responses) and object-style diffs
-            # (DipDup may provide model objects). Be defensive like `on_swap`.
-            action = diff.get('action') if isinstance(diff, dict) else getattr(diff, 'action', None)
-            key = diff.get('key') if isinstance(diff, dict) else getattr(diff, 'key', None)
-
-            if action == 'add_key' or action == 'update':
-                try:
-                    swap_id = int(key)
-                    break
-                except Exception:
-                    continue
+    # Try to find the swap_id from big_map diffs
+    for diff in transaction.data.diffs:
+        if diff.get('action') in ('add_key', 'update') and diff.get('path') == 'swaps':
+            try:
+                swap_id = int(diff.get('key'))
+                break
+            except (ValueError, TypeError):
+                continue
 
     if swap_id is None:
-        # Check if we can get it from storage (optional/fallback) or just return
         return
 
-    # 2. Find or Create the Token
-    # Attach canonical creator identity (safe rollout)
+    objkt_contract = await utils.get_contract(transaction.parameter.fa2, 'hen_objkts')
+    market_contract = await utils.get_contract(transaction.data.target_address, 'teia_market')
+
     creator_holder = await utils.get_holder(transaction.parameter.creator)
 
     token, _ = await models.Token.get_or_create(
-        contract=transaction.parameter.fa2,
+        contract=objkt_contract,
         token_id=transaction.parameter.objkt_id,
         defaults={
             'creator': creator_holder,
-            'creator_address': transaction.parameter.creator,
             'supply': 0,
             'timestamp': transaction.data.timestamp,
         },
@@ -46,13 +39,11 @@ async def on_swap_teia(
 
     seller_holder = await utils.get_holder(transaction.data.sender_address)
 
-    # 3. Create Swap
     await models.Swap.create(
         swap_id=swap_id,
-        contract_address=transaction.data.target_address,
+        contract=market_contract,
         market_version=models.MarketVersion.TEIA,
         seller=seller_holder,
-        seller_address=transaction.data.sender_address,
         token=token,
         amount_initial=transaction.parameter.objkt_amount,
         amount_left=transaction.parameter.objkt_amount,
@@ -60,3 +51,4 @@ async def on_swap_teia(
         royalties_permille=transaction.parameter.royalties,
         timestamp=transaction.data.timestamp,
     )
+    ctx.logger.info(f"  [Teia] Swap {swap_id} created at level {transaction.data.level}")
