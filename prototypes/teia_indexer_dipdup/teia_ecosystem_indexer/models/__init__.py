@@ -168,7 +168,7 @@ class Swap(Model):
 class Trade(Model):
     id = fields.BigIntField(pk=True)
     swap = fields.ForeignKeyField('models.Swap', related_name='trades')
-    
+
     # Denormalized for high-speed Trust Graph queries
     token = fields.ForeignKeyField('models.Token', related_name='trades')
     seller: fields.ForeignKeyField['Holder'] = fields.ForeignKeyField('models.Holder', related_name='sales')
@@ -178,7 +178,7 @@ class Trade(Model):
     amount = fields.BigIntField()
     price_mutez = fields.BigIntField()
     timestamp = fields.DatetimeField()
-    
+
     is_primary_market = fields.BooleanField(default=False, index=True)
 
     class Meta:
