@@ -9,17 +9,11 @@ async def on_swap_v2(
     ctx: HandlerContext,
     transaction: TezosTransaction,
 ) -> None:
-    swap_id = None
-    # Try to find the swap_id from big_map diffs
-    for diff in transaction.data.diffs:
-        if diff.get('action') in ('add_key', 'update') and diff.get('path') == 'swaps':
-            try:
-                swap_id = int(diff.get('key'))
-                break
-            except (ValueError, TypeError):
-                continue
-
-    if swap_id is None:
+    # Use storage counter minus 1 (Hicdex logic)
+    try:
+        swap_id = int(transaction.storage.counter) - 1
+    except (ValueError, TypeError, AttributeError):
+        ctx.logger.error(f"Failed to get swap_id from storage at level {transaction.data.level}")
         return
 
     objkt_contract_address = 'KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton'
@@ -41,16 +35,18 @@ async def on_swap_v2(
 
     seller_holder = await utils.get_holder(transaction.data.sender_address)
 
-    await models.Swap.create(
+    await models.Swap.update_or_create(
         swap_id=swap_id,
         contract=market_contract,
-        market_version=models.MarketVersion.V2,
-        seller=seller_holder,
-        token=token,
-        amount_initial=transaction.parameter.objkt_amount,
-        amount_left=transaction.parameter.objkt_amount,
-        price_mutez=transaction.parameter.xtz_per_objkt,
-        royalties_permille=transaction.parameter.royalties,
-        timestamp=transaction.data.timestamp,
+        defaults={
+            'market_version': models.MarketVersion.V2,
+            'seller': seller_holder,
+            'token': token,
+            'amount_initial': transaction.parameter.objkt_amount,
+            'amount_left': transaction.parameter.objkt_amount,
+            'price_mutez': transaction.parameter.xtz_per_objkt,
+            'royalties_permille': transaction.parameter.royalties,
+            'timestamp': transaction.data.timestamp,
+        }
     )
-    ctx.logger.info(f"  [V2] Swap {swap_id} created at level {transaction.data.level}")
+    ctx.logger.info(f"  [V2] Swap {swap_id} created/updated for token {token.token_id}")

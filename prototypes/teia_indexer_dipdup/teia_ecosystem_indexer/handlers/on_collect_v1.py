@@ -12,10 +12,17 @@ async def on_collect_v1(
     collect: TezosTransaction[CollectParameter, HenMinterV1Storage],
 ) -> None:
     # 1. Resolve Swap
-    swap_id = int(collect.parameter.swap_id)
+    try:
+        swap_id = int(collect.parameter.swap_id)
+    except (ValueError, TypeError, AttributeError):
+        ctx.logger.error(f"Failed to parse swap_id from parameter at level {collect.data.level}")
+        return
+
     contract = await utils.get_contract(collect.data.target_address, 'hen_minter_v1')
     swap = await models.Swap.get_or_none(swap_id=swap_id, contract=contract)
+    
     if not swap:
+        # ctx.logger.warning(f"Swap {swap_id} not found for collect at level {collect.data.level}")
         return
 
     # 2. Update Swap state
@@ -35,4 +42,4 @@ async def on_collect_v1(
         price_mutez=swap.price_mutez,
         timestamp=collect.data.timestamp,
     )
-    ctx.logger.info(f"  [V1] Trade created for swap {swap_id}")
+    ctx.logger.info(f"  [V1] Trade created: {amount_collected} items from swap {swap_id}")

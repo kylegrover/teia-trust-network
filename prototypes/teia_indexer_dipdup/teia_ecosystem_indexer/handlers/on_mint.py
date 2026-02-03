@@ -18,15 +18,20 @@ async def on_mint(
     creator_holder = await utils.get_holder(transaction.parameter.address)
     contract = await utils.get_contract(transaction.data.target_address, 'hen_objkts')
 
-    await models.Token.create(
+    token, created = await models.Token.get_or_create(
         contract=contract,
         token_id=transaction.parameter.token_id,
-        creator=creator_holder,
-        supply=transaction.parameter.amount,
-        metadata_uri=metadata_uri,
-        metadata_synced=False,
-        timestamp=transaction.data.timestamp,
+        defaults={
+            'creator': creator_holder,
+            'supply': transaction.parameter.amount,
+            'metadata_uri': metadata_uri,
+            'metadata_synced': False,
+            'timestamp': transaction.data.timestamp,
+        }
     )
+
+    if not created:
+        ctx.logger.warning(f"Token {transaction.parameter.token_id} already exists, skipping create.")
 
     # Fire the metadata fetcher hook for this new token
     await ctx.fire_hook('fetch_metadata')
