@@ -50,6 +50,7 @@ async def on_swap_v1(
             'price_mutez': swap.parameter.xtz_per_objkt,
             'royalties_permille': 250,  # V1 hardcoded 25% royalties
             'timestamp': swap.data.timestamp,
+            'status': models.SwapStatus.ACTIVE,
         }
     )
     # ctx.logger.info(f"  [V1] Swap {swap_id} created/updated for token {token.token_id}")

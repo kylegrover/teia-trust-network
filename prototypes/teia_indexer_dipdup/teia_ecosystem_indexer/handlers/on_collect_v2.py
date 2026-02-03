@@ -29,7 +29,7 @@ async def on_collect_v2(
     amount_collected = 1  # V2 collects are always 1 item per tx
     swap.amount_left -= amount_collected
     if swap.amount_left <= 0:
-        swap.status = 'finished'
+        swap.status = models.SwapStatus.FINISHED
     await swap.save()
 
     # 3. Record the Trade

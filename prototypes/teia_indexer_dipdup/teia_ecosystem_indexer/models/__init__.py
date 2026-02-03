@@ -10,6 +10,12 @@ class MarketVersion(str, Enum):
     TEIA = 'teia'
 
 
+class SwapStatus(str, Enum):
+    ACTIVE = 'active'
+    FINISHED = 'finished'
+    CANCELED = 'canceled'
+
+
 class Contract(Model):
     """Canonical contract registry.
     Saves massive space by storing KT1... addresses once.
@@ -80,12 +86,36 @@ class TokenMetadata(Model):
     # Extract searchable fields for indexing
     name = fields.TextField(null=True, index=True)
     description = fields.TextField(null=True)
-    # Store 'image' or 'artifact' URI explicitly for UI display without parsing JSON
+    
+    # MIME type and rich URIs
+    mime = fields.TextField(null=True, index=True)
+    artifact_uri = fields.TextField(null=True)
     display_uri = fields.TextField(null=True)
+    thumbnail_uri = fields.TextField(null=True)
 
     # Optional: If you want Full Text Search, we can add triggers later.
     class Meta:
         table = 'token_metadata'
+
+
+class Tag(Model):
+    id = fields.IntField(pk=True)
+    name = fields.CharField(max_length=255, unique=True, index=True)
+
+class TokenTag(Model):
+    id = fields.BigIntField(pk=True)
+    token = fields.ForeignKeyField('models.Token', related_name='tags')
+    tag = fields.ForeignKeyField('models.Tag', related_name='tokens')
+
+    class Meta:
+        unique_together = ('token', 'tag')
+
+
+class IgnoredCid(Model):
+    """CIDs that are known bad or have failed too many times."""
+    cid = fields.CharField(max_length=100, pk=True)
+    reason = fields.TextField(null=True)
+    timestamp = fields.DatetimeField(auto_now_add=True)
 
 
 class Swap(Model):
@@ -104,7 +134,7 @@ class Swap(Model):
     price_mutez = fields.BigIntField()
     royalties_permille = fields.IntField()  # 100 = 10%
 
-    status = fields.CharField(max_length=20, default='active', index=True)  # active, finished, canceled
+    status = fields.EnumField(SwapStatus, default=SwapStatus.ACTIVE, index=True)
     timestamp = fields.DatetimeField()
 
     class Meta:

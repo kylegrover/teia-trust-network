@@ -29,7 +29,7 @@ async def on_collect_teia(
     amount_collected = 1  # Teia marketplace collect is usually 1 item per call
     swap.amount_left -= amount_collected
     if swap.amount_left <= 0:
-        swap.status = 'finished'
+        swap.status = models.SwapStatus.FINISHED
     await swap.save()
 
     # 3. Record the Trade

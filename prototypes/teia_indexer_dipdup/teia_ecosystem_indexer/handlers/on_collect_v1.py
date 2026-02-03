@@ -29,7 +29,7 @@ async def on_collect_v1(
     amount_collected = int(collect.parameter.objkt_amount)
     swap.amount_left -= amount_collected
     if swap.amount_left <= 0:
-        swap.status = 'finished'
+        swap.status = models.SwapStatus.FINISHED
     await swap.save()
 
     # 3. Record the Trade

@@ -45,6 +45,7 @@ async def on_swap_teia(
             'price_mutez': transaction.parameter.xtz_per_objkt,
             'royalties_permille': transaction.parameter.royalties,
             'timestamp': transaction.data.timestamp,
+            'status': models.SwapStatus.ACTIVE,
         }
     )
     # ctx.logger.info(f"  [Teia] Swap {swap_id} created/updated for token {token.token_id}")

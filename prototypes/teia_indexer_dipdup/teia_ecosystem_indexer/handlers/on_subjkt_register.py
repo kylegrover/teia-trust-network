@@ -15,16 +15,16 @@ async def on_subjkt_register(
     field_a = registry.parameter.metadata
     field_b = registry.parameter.subjkt
     
-    def _clean_hex(val: str) -> str:
-        try:
-            if len(val) > 0 and all(c in '0123456789abcdefABCDEF' for c in val):
-                return bytes.fromhex(val).decode('utf-8', errors='ignore')
-            return val
-        except Exception:
-            return val
+    def _clean_val(val: str) -> str:
+        if not val:
+            return ""
+        # 1. Try to decode hex if it looks like hex
+        decoded = utils.from_hex(val)
+        # 2. Ensure null bytes are stripped (postgres protection)
+        return utils.clean_null_bytes(decoded or val)
 
-    val_a = _clean_hex(field_a)
-    val_b = _clean_hex(field_b)
+    val_a = _clean_val(field_a)
+    val_b = _clean_val(field_b)
 
     # 2. Logic to distinguish Handle from IPFS URI
     # Typically metadata = name and subjkt = ipfs, but it can be reversed 

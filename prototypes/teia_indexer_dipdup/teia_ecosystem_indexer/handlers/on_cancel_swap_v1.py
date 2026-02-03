@@ -18,4 +18,4 @@ async def on_cancel_swap_v1(
     await models.Swap.filter(
         swap_id=swap_id,
         contract=contract,
-    ).update(status='canceled')
+    ).update(status=models.SwapStatus.CANCELED)

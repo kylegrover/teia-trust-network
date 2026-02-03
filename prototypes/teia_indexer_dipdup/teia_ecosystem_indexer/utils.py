@@ -16,6 +16,9 @@ from teia_ecosystem_indexer import models
 if TYPE_CHECKING:
     from datetime import datetime
 
+from contextlib import suppress
+
+
 # High-speed memory cache for identities to skip heavy DB IO during deep sync
 _HOLDER_CACHE: dict[str, models.Holder] = {}
 _TOKEN_CACHE: dict[str, models.Token] = {}
@@ -23,7 +26,30 @@ _CONTRACT_CACHE: dict[str, models.Contract] = {}
 _MAX_CACHE_SIZE = 100000
 
 
-async def get_contract(address: str, typename: str | None = None) -> models.Contract:
+def clean_null_bytes(val: Any) -> Any:
+    """Recursively strip null bytes from strings/dicts/lists to prevent DB errors."""
+    if val is None:
+        return ''
+    if isinstance(val, str):
+        return ''.join(val.split('\x00'))
+    if isinstance(val, dict):
+        return {clean_null_bytes(k): clean_null_bytes(v) for k, v in val.items()}
+    if isinstance(val, list):
+        return [clean_null_bytes(x) for x in val]
+    return val
+
+
+def from_hex(hexbytes: str | None) -> str:
+    """Decode hex bytes to UTF-8 or Latin-1 with fallback (hicdex logic)."""
+    if not hexbytes:
+        return ''
+    string = None
+    with suppress(Exception):
+        try:
+            string = bytes.fromhex(hexbytes).decode('utf-8')
+        except Exception:
+            string = bytes.fromhex(hexbytes).decode('latin-1')
+    return clean_null_bytes(string or '')
     """Fetch contract from memory cache or DB, ensuring it exists."""
     contract = _CONTRACT_CACHE.get(address)
     if not contract:
@@ -120,3 +146,14 @@ async def resolve_address_async(obj: Any, fk_attr: str, legacy_attr: str) -> str
         return fk
     # 2) fallback to legacy string column (no extra DB hits)
     return getattr(obj, legacy_attr, None)
+
+
+def clean_null_bytes(val: Any) -> Any:
+    """Recursively strip null bytes from strings/dicts/lists to prevent DB errors."""
+    if isinstance(val, str):
+        return val.replace('\0', '').replace('\u0000', '')
+    if isinstance(val, dict):
+        return {clean_null_bytes(k): clean_null_bytes(v) for k, v in val.items()}
+    if isinstance(val, list):
+        return [clean_null_bytes(x) for x in val]
+    return val
