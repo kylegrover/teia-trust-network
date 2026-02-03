@@ -1,7 +1,7 @@
 from dipdup.context import HandlerContext
 from dipdup.models.tezos import TezosTransaction
 
-from teia_ecosystem_indexer import models
+from teia_ecosystem_indexer import models, utils
 
 
 async def on_swap_v2(
@@ -31,7 +31,7 @@ async def on_swap_v2(
     objkt_contract = 'KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton'
 
     # Ensure creator identity exists and attach FK in the Token row (defaults)
-    creator_holder, _ = await models.Holder.get_or_create(address=transaction.parameter.creator)
+    creator_holder = await utils.get_holder(transaction.parameter.creator)
 
     token, _ = await models.Token.get_or_create(
         contract=objkt_contract,
@@ -44,7 +44,7 @@ async def on_swap_v2(
         },
     )
 
-    seller_holder, _ = await models.Holder.get_or_create(address=transaction.data.sender_address)
+    seller_holder = await utils.get_holder(transaction.data.sender_address)
 
     await models.Swap.create(
         swap_id=swap_id,

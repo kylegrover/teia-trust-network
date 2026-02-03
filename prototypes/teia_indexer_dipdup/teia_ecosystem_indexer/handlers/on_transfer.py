@@ -1,7 +1,7 @@
 from dipdup.context import HandlerContext
 from dipdup.models.tezos import TezosTransaction
 
-from teia_ecosystem_indexer import models
+from teia_ecosystem_indexer import models, utils
 
 
 async def on_transfer(
@@ -19,7 +19,7 @@ async def on_transfer(
     for item in items:
         # Use simple dot notation for generated Pydantic models
         from_address = item.from_
-        from_holder, _ = await models.Holder.get_or_create(address=from_address)
+        from_holder = await utils.get_holder(from_address)
 
         for tx in item.txs:
             to_address = tx.to_
@@ -31,7 +31,7 @@ async def on_transfer(
             if not token:
                 continue
 
-            to_holder, _ = await models.Holder.get_or_create(address=to_address)
+            to_holder = await utils.get_holder(to_address)
 
             await models.Transfer.create(
                 token=token,
@@ -43,3 +43,5 @@ async def on_transfer(
                 timestamp=transfer.data.timestamp,
                 level=transfer.data.level,
             )
+
+

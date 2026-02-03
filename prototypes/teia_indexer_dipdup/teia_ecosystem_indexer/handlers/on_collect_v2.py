@@ -2,6 +2,7 @@ from dipdup.context import HandlerContext
 from dipdup.models.tezos import TezosTransaction
 
 from teia_ecosystem_indexer import models as models
+from teia_ecosystem_indexer import utils
 from teia_ecosystem_indexer.types.hen_market_v2.tezos_parameters.collect import CollectParameter
 from teia_ecosystem_indexer.types.hen_market_v2.tezos_storage import HenMarketV2Storage
 
@@ -25,7 +26,7 @@ async def on_collect_v2(
     await swap.save()
 
     # 3. Record the Trade (Hybrid Identity)
-    buyer_holder, _ = await models.Holder.get_or_create(address=collect.data.sender_address)
+    buyer_holder = await utils.get_holder(collect.data.sender_address)
 
     await models.Trade.create(
         swap=swap,

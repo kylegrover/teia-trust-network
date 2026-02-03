@@ -2,6 +2,7 @@ from dipdup.context import HandlerContext
 from dipdup.models.tezos import TezosTransaction
 
 from teia_ecosystem_indexer import models as models
+from teia_ecosystem_indexer import utils
 from teia_ecosystem_indexer.types.hen_minter_v1.tezos_parameters.swap import SwapParameter
 from teia_ecosystem_indexer.types.hen_minter_v1.tezos_storage import HenMinterV1Storage
 
@@ -34,7 +35,7 @@ async def on_swap_v1(
         # Fallback if mint was missed (not ideal)
         return
 
-    seller_holder, _ = await models.Holder.get_or_create(address=swap.data.sender_address)
+    seller_holder = await utils.get_holder(swap.data.sender_address)
 
     await models.Swap.create(
         swap_id=swap_id,

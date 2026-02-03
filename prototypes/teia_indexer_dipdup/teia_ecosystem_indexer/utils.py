@@ -13,6 +13,28 @@ from typing import Any
 from teia_ecosystem_indexer import models
 
 
+# High-speed memory cache for Holder identities to skip heavy DB IO during deep sync
+_HOLDER_CACHE: dict[str, models.Holder] = {}
+_MAX_CACHE_SIZE = 100000
+
+
+async def get_holder(address: str) -> models.Holder:
+    """Fetch holder from memory cache or DB, ensuring it exists."""
+    if address in _HOLDER_CACHE:
+        return _HOLDER_CACHE[address]
+
+    holder, _ = await models.Holder.get_or_create(address=address)
+
+    # Simple cache eviction to keep RAM usage sane
+    if len(_HOLDER_CACHE) > _MAX_CACHE_SIZE:
+        # Clear oldest (first inserted in dict)
+        key_to_del = next(iter(_HOLDER_CACHE))
+        del _HOLDER_CACHE[key_to_del]
+
+    _HOLDER_CACHE[address] = holder
+    return holder
+
+
 async def resolve_holder_async(value: Any) -> models.Holder | None:
     """Return a Holder from an id or address or model instance (or None)."""
     if value is None:

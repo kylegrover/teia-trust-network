@@ -1,7 +1,7 @@
 from dipdup.context import HandlerContext
 from dipdup.models.tezos import TezosTransaction
 
-from teia_ecosystem_indexer import models
+from teia_ecosystem_indexer import models, utils
 from teia_ecosystem_indexer.types.teia_market.tezos_parameters.collect import CollectParameter
 
 
@@ -62,7 +62,7 @@ async def on_collect_teia(
         swap.status = 'finished'
     await swap.save()
 
-    buyer_holder, _ = await models.Holder.get_or_create(address=transaction.data.sender_address)
+    buyer_holder = await utils.get_holder(transaction.data.sender_address)
 
     await models.Trade.create(
         swap=swap,

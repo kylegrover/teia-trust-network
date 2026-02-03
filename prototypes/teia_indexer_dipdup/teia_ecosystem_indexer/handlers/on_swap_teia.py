@@ -1,7 +1,7 @@
 from dipdup.context import HandlerContext
 from dipdup.models.tezos import TezosTransaction
 
-from teia_ecosystem_indexer import models
+from teia_ecosystem_indexer import models, utils
 
 
 async def on_swap_teia(
@@ -30,7 +30,7 @@ async def on_swap_teia(
 
     # 2. Find or Create the Token
     # Attach canonical creator identity (safe rollout)
-    creator_holder, _ = await models.Holder.get_or_create(address=transaction.parameter.creator)
+    creator_holder = await utils.get_holder(transaction.parameter.creator)
 
     token, _ = await models.Token.get_or_create(
         contract=transaction.parameter.fa2,
@@ -43,7 +43,7 @@ async def on_swap_teia(
         },
     )
 
-    seller_holder, _ = await models.Holder.get_or_create(address=transaction.data.sender_address)
+    seller_holder = await utils.get_holder(transaction.data.sender_address)
 
     # 3. Create Swap
     await models.Swap.create(
