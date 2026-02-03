@@ -90,7 +90,7 @@ async def fetch_metadata(ctx: HookContext) -> None:
 
                 token.metadata_synced = True
                 await token.save()
-                ctx.logger.info('Fetched metadata for Token %s', token.token_id)
+                # ctx.logger.info('Fetched metadata for Token %s', token.token_id)
             else:
                 ctx.logger.warning('Failed all IPFS gateways for token %s (%s)', token.token_id, cid)
 
@@ -111,6 +111,6 @@ async def fetch_metadata(ctx: HookContext) -> None:
                 )
                 holder.metadata_synced = True
                 await holder.save()
-                ctx.logger.info('Fetched metadata for Holder %s (%s)', holder.name, holder.address)
+                # ctx.logger.info('Fetched metadata for Holder %s (%s)', holder.name, holder.address)
             else:
                 ctx.logger.warning('Failed all IPFS gateways for holder %s', holder.address)
