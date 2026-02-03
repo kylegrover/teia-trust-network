@@ -1,7 +1,8 @@
 from dipdup.context import HandlerContext
 from dipdup.models.tezos import TezosTransaction
 
-from teia_ecosystem_indexer import models, utils
+from teia_ecosystem_indexer import models
+from teia_ecosystem_indexer import utils
 
 
 async def on_transfer(
@@ -43,5 +44,3 @@ async def on_transfer(
                 timestamp=transfer.data.timestamp,
                 level=transfer.data.level,
             )
-
-

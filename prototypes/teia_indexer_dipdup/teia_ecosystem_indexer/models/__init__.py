@@ -17,6 +17,7 @@ class Holder(Model):
 
     id = fields.IntField(pk=True)
     address = fields.CharField(max_length=36, unique=True)
+    name = fields.TextField(null=True, index=True)
     first_seen = fields.DatetimeField(null=True)
     last_seen = fields.DatetimeField(null=True)
 

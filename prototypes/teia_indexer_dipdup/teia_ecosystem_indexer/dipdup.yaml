@@ -3,7 +3,9 @@ package: teia_ecosystem_indexer
 
 # Increase watchdog threshold to handle heavy historical transfer batches
 advanced:
-  watchdog_timeout: 60
+  watchdog_timeout: 120
+  early_realtime: True
+  merge_subscriptions: True
 
 database:
   kind: sqlite
@@ -48,11 +50,6 @@ contracts:
   hen_subjkts:
     address: KT1My1wDZHDGweCrJnQJi3wcFaS67iksirvj
     typename: hen_subjkts
-
-  # hDAO Curation
-  hdao_curation:
-    address: KT1TybhR7XraG75JFYKSrh7KnxukMBT5dor6
-    typename: hdao_curation
 
 indexes:
   # 1. Token Indexing (Mints)
@@ -147,23 +144,6 @@ indexes:
         pattern:
           - destination: hen_subjkts
             entrypoint: registry
-
-  # 6. hDAO Curation
-  hdao_curation_index:
-    kind: tezos.operations
-    datasources:
-      - tzkt
-    contracts:
-      - hdao_curation
-    handlers:
-      - callback: on_hdao_curate
-        pattern:
-          - destination: hdao_curation
-            entrypoint: curate
-      - callback: on_hdao_claim
-        pattern:
-          - destination: hdao_curation
-            entrypoint: claim_hDAO
 
 # Hook to fetch IPFS metadata asynchronously
 hooks:

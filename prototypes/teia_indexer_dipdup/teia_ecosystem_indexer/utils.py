@@ -7,10 +7,14 @@ Keep helpers minimal and defensive so they can be applied repo-wide without risk
 """
 
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from typing import Any
-from datetime import datetime
+
 from teia_ecosystem_indexer import models
 
+if TYPE_CHECKING:
+    from datetime import datetime
 
 # High-speed memory cache for Holder identities to skip heavy DB IO during deep sync
 _HOLDER_CACHE: dict[str, models.Holder] = {}
@@ -28,7 +32,7 @@ async def get_holder(address: str, timestamp: datetime | None = None) -> models.
             holder.first_seen = timestamp
             holder.last_seen = timestamp
             await holder.save()
-        
+
         # Simple cache eviction
         if len(_HOLDER_CACHE) > _MAX_CACHE_SIZE:
             key_to_del = next(iter(_HOLDER_CACHE))
@@ -44,7 +48,7 @@ async def get_holder(address: str, timestamp: datetime | None = None) -> models.
         if holder.last_seen is None or timestamp > holder.last_seen:
             holder.last_seen = timestamp
             changed = True
-        
+
         if changed:
             await holder.save()
 
@@ -53,7 +57,7 @@ async def get_holder(address: str, timestamp: datetime | None = None) -> models.
 
 async def get_token(contract: str, token_id: int) -> models.Token | None:
     """Fetch token from memory cache or DB."""
-    cache_key = f"{contract}:{token_id}"
+    cache_key = f'{contract}:{token_id}'
     if cache_key in _TOKEN_CACHE:
         return _TOKEN_CACHE[cache_key]
 
@@ -63,7 +67,7 @@ async def get_token(contract: str, token_id: int) -> models.Token | None:
             key_to_del = next(iter(_TOKEN_CACHE))
             del _TOKEN_CACHE[key_to_del]
         _TOKEN_CACHE[cache_key] = token
-    
+
     return token
 
 

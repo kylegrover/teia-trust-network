@@ -37,7 +37,7 @@ async def on_swap_v1(
             'supply': 0,
             'timestamp': swap.data.timestamp,
             'metadata_synced': False,
-        }
+        },
     )
 
     seller_holder = await utils.get_holder(swap.data.sender_address)
@@ -56,4 +56,3 @@ async def on_swap_v1(
         timestamp=swap.data.timestamp,
     )
     # print(f"  [V1] Swap {swap_id} created for token {token.token_id}")
-
