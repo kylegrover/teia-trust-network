@@ -9,11 +9,11 @@ async def on_swap_v2(
     ctx: HandlerContext,
     transaction: TezosTransaction,
 ) -> None:
-    # Use storage counter minus 1 (Hicdex logic)
+    # Use storage counter (V2 uses 'counter' field for swaps)
     try:
         swap_id = int(transaction.storage.counter) - 1
     except (ValueError, TypeError, AttributeError):
-        ctx.logger.error(f"Failed to get swap_id from storage at level {transaction.data.level}")
+        ctx.logger.error(f"Failed to get swap_id from V2 storage at level {transaction.data.level}")
         return
 
     objkt_contract_address = 'KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton'
@@ -21,7 +21,7 @@ async def on_swap_v2(
     market_contract = await utils.get_contract(transaction.data.target_address, 'hen_market_v2')
 
     # Ensure creator identity exists
-    creator_holder = await utils.get_holder(transaction.parameter.creator)
+    creator_holder = await utils.get_holder(transaction.parameter.creator, transaction.data.timestamp)
 
     token, _ = await models.Token.get_or_create(
         contract=objkt_contract,
@@ -33,7 +33,7 @@ async def on_swap_v2(
         },
     )
 
-    seller_holder = await utils.get_holder(transaction.data.sender_address)
+    seller_holder = await utils.get_holder(transaction.data.sender_address, transaction.data.timestamp)
 
     await models.Swap.update_or_create(
         swap_id=swap_id,

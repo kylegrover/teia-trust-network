@@ -19,7 +19,7 @@ async def on_swap_teia(
     objkt_contract = await utils.get_contract(transaction.parameter.fa2, 'hen_objkts')
     market_contract = await utils.get_contract(transaction.data.target_address, 'teia_market')
 
-    creator_holder = await utils.get_holder(transaction.parameter.creator)
+    creator_holder = await utils.get_holder(transaction.parameter.creator, transaction.data.timestamp)
 
     token, _ = await models.Token.get_or_create(
         contract=objkt_contract,
@@ -31,7 +31,7 @@ async def on_swap_teia(
         },
     )
 
-    seller_holder = await utils.get_holder(transaction.data.sender_address)
+    seller_holder = await utils.get_holder(transaction.data.sender_address, transaction.data.timestamp)
 
     await models.Swap.update_or_create(
         swap_id=swap_id,

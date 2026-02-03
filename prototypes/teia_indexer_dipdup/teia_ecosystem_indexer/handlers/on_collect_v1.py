@@ -33,7 +33,7 @@ async def on_collect_v1(
     await swap.save()
 
     # 3. Record the Trade
-    buyer_holder = await utils.get_holder(collect.data.sender_address)
+    buyer_holder = await utils.get_holder(collect.data.sender_address, collect.data.timestamp)
 
     await models.Trade.create(
         swap=swap,

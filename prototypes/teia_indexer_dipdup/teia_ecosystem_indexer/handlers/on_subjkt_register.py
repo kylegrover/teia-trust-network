@@ -11,11 +11,28 @@ async def on_subjkt_register(
     ctx: HandlerContext,
     registry: TezosTransaction[RegistryParameter, HenSubjktsStorage],
 ) -> None:
-    # Decode the subjkt (bytes to string if necessary, but Pydantic might have handled it)
-    name = registry.parameter.subjkt
-    # The contract sometimes receives hex-encoded names, but DipDup usually handles strings
-    # We'll just store it as is for now.
+    # 1. Decode subjkts name (it's in 'metadata', 'subjkt' is the IPFS link)
+    name_raw = registry.parameter.metadata
+    profile_raw = registry.parameter.subjkt
+    
+    def _clean_hex(val: str) -> str:
+        try:
+            # Try to convert hex to string if it looks like hex
+            if len(val) > 0 and all(c in '0123456789abcdefABCDEF' for c in val):
+                return bytes.fromhex(val).decode('utf-8', errors='ignore')
+            return val
+        except Exception:
+            return val
 
-    holder = await utils.get_holder(registry.data.sender_address)
+    name = _clean_hex(name_raw)
+    profile_uri = _clean_hex(profile_raw)
+
+    # 2. Update Holder
+    holder = await utils.get_holder(registry.data.sender_address, registry.data.timestamp)
+    
+    # Store the cleaned name
     holder.name = name
+    # We might want to store profile_uri in the future, for now we log it
     await holder.save()
+
+    ctx.logger.info(f"Registered subjkt: {name} profile: {profile_uri} for {registry.data.sender_address}")

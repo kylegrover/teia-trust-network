@@ -42,16 +42,10 @@ async def get_holder(address: str, timestamp: datetime | None = None) -> models.
     holder = _HOLDER_CACHE.get(address)
 
     if not holder:
-        holder, created = await models.Holder.get_or_create(address=address)
-        if created and timestamp:
-            holder.first_seen = timestamp
-            holder.last_seen = timestamp
-            await holder.save()
-
-        # Simple cache eviction
-        if len(_HOLDER_CACHE) > _MAX_CACHE_SIZE:
-            key_to_del = next(iter(_HOLDER_CACHE))
-            del _HOLDER_CACHE[key_to_del]
+        holder, _ = await models.Holder.get_or_create(address=address)
+        if len(_HOLDER_CACHE) >= _MAX_CACHE_SIZE:
+            # Pop the first item (FIFO-ish eviction)
+            _HOLDER_CACHE.pop(next(iter(_HOLDER_CACHE)))
         _HOLDER_CACHE[address] = holder
 
     # Update activity timestamps if provided (Historical sync tracking)

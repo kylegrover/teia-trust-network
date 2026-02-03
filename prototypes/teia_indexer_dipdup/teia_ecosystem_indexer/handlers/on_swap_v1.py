@@ -11,11 +11,11 @@ async def on_swap_v1(
     ctx: HandlerContext,
     swap: TezosTransaction[SwapParameter, HenMinterV1Storage],
 ) -> None:
-    # Use storage counter minus 1 (Hicdex logic)
+    # Use storage swap_id (V1 uses 'swap_id' field for swaps)
     try:
         swap_id = int(swap.storage.swap_id) - 1
-    except (ValueError, TypeError):
-        ctx.logger.error(f"Failed to get swap_id from storage at level {swap.data.level}")
+    except (ValueError, TypeError, AttributeError):
+        ctx.logger.error(f"Failed to get swap_id from V1 storage at level {swap.data.level}")
         return
 
     objkt_contract_address = 'KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton'
@@ -23,7 +23,7 @@ async def on_swap_v1(
     market_contract = await utils.get_contract(swap.data.target_address, 'hen_minter_v1')
 
     # In V1, we don't have creator in the parameter.
-    creator_holder = await utils.get_holder(swap.data.sender_address)
+    creator_holder = await utils.get_holder(swap.data.sender_address, swap.data.timestamp)
 
     token, _ = await models.Token.get_or_create(
         contract=objkt_contract,
@@ -36,7 +36,7 @@ async def on_swap_v1(
         },
     )
 
-    seller_holder = await utils.get_holder(swap.data.sender_address)
+    seller_holder = await utils.get_holder(swap.data.sender_address, swap.data.timestamp)
 
     await models.Swap.update_or_create(
         swap_id=swap_id,

@@ -1,0 +1,193 @@
+$ uv run ../debug_schema.py
+
+================================================================================
+Inspecting hen_objkts (KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton)
+================================================================================
+
+================================================================================
+Inspecting hen_minter_v1 (KT1Hkg5qeNhfwpKW4fXvq7HGZB9z2EnmCCA9)
+================================================================================
+
+================================================================================
+Inspecting hen_market_v2 (KT1HbQepzV1nVGg8QVznG7z4RcHseD5kwqBn)
+================================================================================
+
+================================================================================
+Inspecting teia_market (KT1PHubm9HtyQEJ4BBpMTVomq6mhbfNZ9z5w)
+================================================================================
+
+================================================================================
+Inspecting hen_subjkts (KT1My1wDZHDGweCrJnQJi3wcFaS67iksirvj)
+================================================================================
+
+[STORAGE EXAMPLE]
+{
+  "fee": "10",
+  "objkt": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+  "swaps": 6072,
+  "counter": "2091464",
+  "manager": "tz1UBZUkXpKGhYsP5KtzDNqLLchwF4uHrGjw",
+  "metadata": 6071
+}
+
+[STORAGE EXAMPLE]
+{
+  "ledger": 511,
+  "paused": false,
+  "metadata": 512,
+  "operators": 513,
+  "all_tokens": "876950",
+  "administrator": "KT1Hkg5qeNhfwpKW4fXvq7HGZB9z2EnmCCA9",
+  "token_metadata": 514
+}
+
+[STORAGE EXAMPLE]
+{
+  "hdao": "KT1AFA2mwNUMNd4SsujE1YYp29vd8BZejyKW",
+  "size": "0",
+  "objkt": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+  "swaps": 523,
+  "curate": "KT1TybhR7XraG75JFYKSrh7KnxukMBT5dor6",
+  "locked": true,
+  "genesis": "2021-04-15T02:09:41Z",
+  "manager": "KT1D4L7JewyDeA21wDzfWJgRmw948bLaKymb",
+  "swap_id": "348155",
+  "metadata": 521,
+  "objkt_id": "876950",
+  "royalties": 522
+}
+
+[STORAGE EXAMPLE]
+{
+  "entries": 3916,
+  "manager": "tz1Y1j7FK1X9Rrv2VdPz5bXoU7SszF8W1RnK",
+  "subjkts": 3920,
+  "invoices": 3917,
+  "metadata": 3918,
+  "registries": 3919,
+  "subjkts_metadata": 3921
+}
+
+[STORAGE EXAMPLE]
+{
+  "fee": "25",
+  "swaps": 90366,
+  "counter": "235849",
+  "manager": "KT1J9FYz29RBQi1oGLw8uXyACrzXzV1dHuvb",
+  "metadata": 90365,
+  "allowed_fa2s": 90364,
+  "swaps_paused": false,
+  "fee_recipient": "KT1J9FYz29RBQi1oGLw8uXyACrzXzV1dHuvb",
+  "collects_paused": false,
+  "proposed_manager": null
+}
+
+[BIG MAPS]
+- ID 6072: swaps (key: None, value: None)
+- ID 6071: metadata (key: None, value: None)
+
+[BIG MAPS]
+- ID 514: token_metadata (key: None, value: None)
+- ID 513: operators (key: None, value: None)
+- ID 512: metadata (key: None, value: None)
+- ID 511: ledger (key: None, value: None)
+
+[BIG MAPS]
+- ID 523: swaps (key: None, value: None)
+- ID 522: royalties (key: None, value: None)
+- ID 521: metadata (key: None, value: None)
+
+[BIG MAPS]
+- ID 3921: subjkts_metadata (key: None, value: None)
+- ID 3920: subjkts (key: None, value: None)
+- ID 3919: registries (key: None, value: None)
+- ID 3918: metadata (key: None, value: None)
+- ID 3917: invoices (key: None, value: None)
+- ID 3916: entries (key: None, value: None)
+
+[BIG MAPS]
+- ID 90366: swaps (key: None, value: None)
+- ID 90365: metadata (key: None, value: None)
+- ID 90364: allowed_fa2s (key: None, value: None)
+
+[ENTRYPOINTS]
+- cancel_swap
+- collect
+- swap
+- update_fee
+- update_manager
+
+[ENTRYPOINTS]
+- balance_of
+- hDAO_batch
+- mint
+- set_administrator
+- set_pause
+- token_metadata
+- transfer
+- update_operators
+
+[ENTRYPOINTS]
+- cancel_swap
+- collect
+- curate
+- genesis
+- mint_OBJKT
+- swap
+- update_manager
+
+[ENTRYPOINTS]
+- ban
+- registry
+- unregistry
+- update_manager
+
+[ENTRYPOINTS]
+- accept_manager
+- add_fa2
+- cancel_swap
+- collect
+- remove_fa2
+- set_pause_collects
+- set_pause_swaps
+- swap
+- transfer_manager
+- update_fee
+- update_fee_recipient
+- update_metadata
+
+[SAMPLE TRANSACTION PARAMETER]
+Entrypoint: swap
+{
+  "creator": "tz1Y1j7FK1X9Rrv2VdPz5bXoU7SszF8W1RnK",
+  "objkt_id": "127648",
+  "royalties": "150",
+  "objkt_amount": "1",
+  "xtz_per_objkt": "15000000"
+}
+
+[SAMPLE TRANSACTION PARAMETER]
+Entrypoint: set_administrator
+"KT1Hkg5qeNhfwpKW4fXvq7HGZB9z2EnmCCA9"
+
+[SAMPLE TRANSACTION PARAMETER]
+Entrypoint: genesis
+{}
+
+[SAMPLE TRANSACTION PARAMETER]
+Entrypoint: registry
+{
+  "subjkt": "697066733a2f2f516d61785435644c41586d4e61456271334d39545971384a5070383445313136785775364b43786f5933356b5051",
+  "metadata": "63727a797061746368776f726b"
+}
+
+[SAMPLE TRANSACTION PARAMETER]
+Entrypoint: swap
+{
+  "fa2": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+  "creator": "tz1g6JRCpsEnD2BLiAzPNK3GBD1fKicV9rCx",
+  "objkt_id": "531011",
+  "royalties": "200",
+  "objkt_amount": "20",
+  "xtz_per_objkt": "100000"
+}

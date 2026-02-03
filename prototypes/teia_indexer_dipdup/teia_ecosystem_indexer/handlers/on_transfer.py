@@ -30,6 +30,9 @@ async def on_transfer(
             # Resolve Token from cache/DB
             token = await utils.get_token(transfer.data.target_address, token_id)
             if not token:
+                # If we don't have the token yet (e.g. indexing out of order), 
+                # we should still track the holder timestamps
+                await utils.get_holder(to_address, transfer.data.timestamp)
                 continue
 
             to_holder = await utils.get_holder(to_address, transfer.data.timestamp)

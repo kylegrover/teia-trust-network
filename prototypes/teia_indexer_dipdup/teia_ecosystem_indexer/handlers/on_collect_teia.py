@@ -33,7 +33,7 @@ async def on_collect_teia(
     await swap.save()
 
     # 3. Record the Trade
-    buyer_holder = await utils.get_holder(transaction.data.sender_address)
+    buyer_holder = await utils.get_holder(transaction.data.sender_address, transaction.data.timestamp)
 
     await models.Trade.create(
         swap=swap,
