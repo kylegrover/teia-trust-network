@@ -87,7 +87,7 @@ class TokenHolder(Model):
 
     id = fields.BigIntField(pk=True)
     token = fields.ForeignKeyField('models.Token', related_name='holders')
-    holder = fields.ForeignKeyField('models.Holder', related_name='holdings')
+    holder = fields.ForeignKeyField('models.Holder', related_name='holdings', index=True)
     quantity = fields.BigIntField(default=0)
 
     class Meta:
@@ -178,6 +178,14 @@ class Trade(Model):
     amount = fields.BigIntField()
     price_mutez = fields.BigIntField()
     timestamp = fields.DatetimeField()
+    
+    is_primary_market = fields.BooleanField(default=False, index=True)
+
+    class Meta:
+        indexes = (
+            ('buyer', 'creator'),  # Trust Graph: "Who buys from whom?"
+            ('seller', 'timestamp'),  # Sales History: "What did X sell recently?"
+        )
 
 
 class Transfer(Model):

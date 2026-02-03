@@ -44,5 +44,6 @@ async def on_collect_teia(
         amount=amount_collected,
         price_mutez=swap.price_mutez,
         timestamp=transaction.data.timestamp,
+        is_primary_market=(swap.seller_id == swap.token.creator_id),
     )
     # ctx.logger.info(f"  [Teia] Trade created: 1 item from swap {swap_id}")

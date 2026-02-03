@@ -44,5 +44,6 @@ async def on_collect_v1(
         amount=amount_collected,
         price_mutez=swap.price_mutez,
         timestamp=collect.data.timestamp,
+        is_primary_market=(swap.seller_id == swap.token.creator_id),
     )
     # ctx.logger.info(f"  [V1] Trade created: {amount_collected} items from swap {swap_id}")
