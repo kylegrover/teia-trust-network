@@ -10,16 +10,26 @@ async def on_split_origination(
     origination_0: TezosOperationData,
 ) -> None:
     # 1. Resolve storage
-    # In DipDup 8.x for generic originations, storage is in origination_0.storage
     storage = origination_0.storage
     if not storage:
         return
 
-    # Extract fields from storage (Hicdex pattern)
-    shares = getattr(storage, 'shares', {})
-    administrator_address = getattr(storage, 'administrator', None)
-    total_shares = int(getattr(storage, 'totalShares', 0) or getattr(storage, 'total_shares', 0))
-    core_participants = getattr(storage, 'coreParticipants', [])
+    # Helper to get value from dict or object (since generic operations can return either)
+    def get_val(obj, key, default=None):
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+
+    # Extract fields from storage (Hicdex pattern supports multiple field naming styles)
+    shares = get_val(storage, 'shares', {})
+    administrator_address = get_val(storage, 'administrator')
+    
+    # Try both camelCase and snake_case for totalShares
+    ts_val = get_val(storage, 'totalShares') or get_val(storage, 'total_shares', 0)
+    total_shares = int(ts_val)
+    
+    # Try both camelCase and snake_case for coreParticipants
+    core_participants = get_val(storage, 'coreParticipants') or get_val(storage, 'core_participants', [])
 
     if not administrator_address:
         return

@@ -75,6 +75,7 @@ indexes:
     kind: tezos.operations
     datasources: 
       - tzkt
+    first_level: 1365000
     contracts:
       - hen_objkts
     handlers:
@@ -92,6 +93,7 @@ indexes:
     kind: tezos.operations
     datasources: 
       - tzkt
+    first_level: 1365000
     contracts:
       - hen_minter_v1
     handlers:
@@ -113,6 +115,7 @@ indexes:
     kind: tezos.operations
     datasources: 
       - tzkt
+    first_level: 1365000
     contracts:
       - hen_market_v2
     handlers:
@@ -134,6 +137,7 @@ indexes:
     kind: tezos.operations
     datasources: 
       - tzkt
+    first_level: 1365000
     contracts:
       - teia_market
     handlers:
@@ -155,6 +159,7 @@ indexes:
     kind: tezos.operations
     datasources:
       - tzkt
+    first_level: 1365000
     contracts:
       - hen_subjkts
     handlers:
@@ -172,6 +177,9 @@ indexes:
     kind: tezos.operations
     datasources:
       - tzkt
+    first_level: 1365000
+    contracts:
+      - hen_split_factory
     handlers:
       - callback: on_split_origination
         pattern:
@@ -183,6 +191,7 @@ indexes:
     kind: tezos.operations
     datasources:
       - tzkt
+    first_level: 1365000
     contracts:
       - hen_split_signer
     handlers:
