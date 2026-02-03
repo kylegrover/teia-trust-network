@@ -19,19 +19,19 @@ async def on_transfer(
     for item in items:
         # Use simple dot notation for generated Pydantic models
         from_address = item.from_
-        from_holder = await utils.get_holder(from_address)
+        from_holder = await utils.get_holder(from_address, transfer.data.timestamp)
 
         for tx in item.txs:
             to_address = tx.to_
             token_id = int(tx.token_id)
             amount = int(tx.amount)
 
-            # Resolve Token
-            token = await models.Token.get_or_none(contract=transfer.data.target_address, token_id=token_id)
+            # Resolve Token from cache/DB
+            token = await utils.get_token(transfer.data.target_address, token_id)
             if not token:
                 continue
 
-            to_holder = await utils.get_holder(to_address)
+            to_holder = await utils.get_holder(to_address, transfer.data.timestamp)
 
             await models.Transfer.create(
                 token=token,

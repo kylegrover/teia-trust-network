@@ -29,11 +29,16 @@ async def on_swap_v1(
     objkt_contract = 'KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton'
 
     # In V1, we don't have creator in the parameter.
-    # We find the Token record which should have been created by on_mint.
-    token = await models.Token.get_or_none(contract=objkt_contract, token_id=swap.parameter.objkt_id)
-    if not token:
-        # Fallback if mint was missed (not ideal)
-        return
+    # Use get_or_create to handle cases where market index is ahead of token index
+    token, _ = await models.Token.get_or_create(
+        contract=objkt_contract,
+        token_id=swap.parameter.objkt_id,
+        defaults={
+            'supply': 0,
+            'timestamp': swap.data.timestamp,
+            'metadata_synced': False,
+        }
+    )
 
     seller_holder = await utils.get_holder(swap.data.sender_address)
 
@@ -50,3 +55,5 @@ async def on_swap_v1(
         royalties_permille=250,  # V1 hardcoded 25% royalties
         timestamp=swap.data.timestamp,
     )
+    # print(f"  [V1] Swap {swap_id} created for token {token.token_id}")
+

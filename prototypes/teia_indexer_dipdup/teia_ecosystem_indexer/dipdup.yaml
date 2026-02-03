@@ -1,9 +1,15 @@
 spec_version: 3.0
 package: teia_ecosystem_indexer
 
+# Increase watchdog threshold to handle heavy historical transfer batches
+advanced:
+  watchdog_timeout: 60
+
 database:
   kind: sqlite
   path: teia_ecosystem.sqlite3
+  immune_tables:
+    - token_metadata
 
 datasources:
   tzkt:
@@ -37,6 +43,16 @@ contracts:
   teia_market:
     address: KT1PHubm9HtyQEJ4BBpMTVomq6mhbfNZ9z5w
     typename: teia_market
+
+  # HEN Identities (Subjkts)
+  hen_subjkts:
+    address: KT1My1wDZHDGweCrJnQJi3wcFaS67iksirvj
+    typename: hen_subjkts
+
+  # hDAO Curation
+  hdao_curation:
+    address: KT1TybhR7XraG75JFYKSrh7KnxukMBT5dor6
+    typename: hdao_curation
 
 indexes:
   # 1. Token Indexing (Mints)
@@ -72,6 +88,10 @@ indexes:
         pattern:
           - destination: hen_minter_v1
             entrypoint: collect
+      - callback: on_cancel_swap_v1
+        pattern:
+          - destination: hen_minter_v1
+            entrypoint: cancel_swap
 
   # 3. V2 Market Indexing
   market_v2_index:
@@ -89,6 +109,10 @@ indexes:
         pattern:
           - destination: hen_market_v2
             entrypoint: collect
+      - callback: on_cancel_swap_v2
+        pattern:
+          - destination: hen_market_v2
+            entrypoint: cancel_swap
 
   # 4. Teia Market Indexing
   market_teia_index:
@@ -106,6 +130,40 @@ indexes:
         pattern:
           - destination: teia_market
             entrypoint: collect
+      - callback: on_cancel_swap_teia
+        pattern:
+          - destination: teia_market
+            entrypoint: cancel_swap
+
+  # 5. Identities (Subjkts)
+  subjkts_index:
+    kind: tezos.operations
+    datasources:
+      - tzkt
+    contracts:
+      - hen_subjkts
+    handlers:
+      - callback: on_subjkt_register
+        pattern:
+          - destination: hen_subjkts
+            entrypoint: registry
+
+  # 6. hDAO Curation
+  hdao_curation_index:
+    kind: tezos.operations
+    datasources:
+      - tzkt
+    contracts:
+      - hdao_curation
+    handlers:
+      - callback: on_hdao_curate
+        pattern:
+          - destination: hdao_curation
+            entrypoint: curate
+      - callback: on_hdao_claim
+        pattern:
+          - destination: hdao_curation
+            entrypoint: claim_hDAO
 
 # Hook to fetch IPFS metadata asynchronously
 hooks:

@@ -7,32 +7,64 @@ Keep helpers minimal and defensive so they can be applied repo-wide without risk
 """
 
 from __future__ import annotations
-
 from typing import Any
-
+from datetime import datetime
 from teia_ecosystem_indexer import models
 
 
 # High-speed memory cache for Holder identities to skip heavy DB IO during deep sync
 _HOLDER_CACHE: dict[str, models.Holder] = {}
+_TOKEN_CACHE: dict[str, models.Token] = {}
 _MAX_CACHE_SIZE = 100000
 
 
-async def get_holder(address: str) -> models.Holder:
+async def get_holder(address: str, timestamp: datetime | None = None) -> models.Holder:
     """Fetch holder from memory cache or DB, ensuring it exists."""
-    if address in _HOLDER_CACHE:
-        return _HOLDER_CACHE[address]
+    holder = _HOLDER_CACHE.get(address)
 
-    holder, _ = await models.Holder.get_or_create(address=address)
+    if not holder:
+        holder, created = await models.Holder.get_or_create(address=address)
+        if created and timestamp:
+            holder.first_seen = timestamp
+            holder.last_seen = timestamp
+            await holder.save()
+        
+        # Simple cache eviction
+        if len(_HOLDER_CACHE) > _MAX_CACHE_SIZE:
+            key_to_del = next(iter(_HOLDER_CACHE))
+            del _HOLDER_CACHE[key_to_del]
+        _HOLDER_CACHE[address] = holder
 
-    # Simple cache eviction to keep RAM usage sane
-    if len(_HOLDER_CACHE) > _MAX_CACHE_SIZE:
-        # Clear oldest (first inserted in dict)
-        key_to_del = next(iter(_HOLDER_CACHE))
-        del _HOLDER_CACHE[key_to_del]
+    # Update activity timestamps if provided (Historical sync tracking)
+    if timestamp:
+        changed = False
+        if holder.first_seen is None or timestamp < holder.first_seen:
+            holder.first_seen = timestamp
+            changed = True
+        if holder.last_seen is None or timestamp > holder.last_seen:
+            holder.last_seen = timestamp
+            changed = True
+        
+        if changed:
+            await holder.save()
 
-    _HOLDER_CACHE[address] = holder
     return holder
+
+
+async def get_token(contract: str, token_id: int) -> models.Token | None:
+    """Fetch token from memory cache or DB."""
+    cache_key = f"{contract}:{token_id}"
+    if cache_key in _TOKEN_CACHE:
+        return _TOKEN_CACHE[cache_key]
+
+    token = await models.Token.get_or_none(contract=contract, token_id=token_id)
+    if token:
+        if len(_TOKEN_CACHE) > _MAX_CACHE_SIZE:
+            key_to_del = next(iter(_TOKEN_CACHE))
+            del _TOKEN_CACHE[key_to_del]
+        _TOKEN_CACHE[cache_key] = token
+    
+    return token
 
 
 async def resolve_holder_async(value: Any) -> models.Holder | None:
