@@ -42,4 +42,4 @@ async def on_collect_v1(
         price_mutez=swap.price_mutez,
         timestamp=collect.data.timestamp,
     )
-    ctx.logger.info(f"  [V1] Trade created: {amount_collected} items from swap {swap_id}")
+    # ctx.logger.info(f"  [V1] Trade created: {amount_collected} items from swap {swap_id}")

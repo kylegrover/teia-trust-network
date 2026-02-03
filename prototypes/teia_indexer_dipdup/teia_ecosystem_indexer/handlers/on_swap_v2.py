@@ -49,4 +49,4 @@ async def on_swap_v2(
             'timestamp': transaction.data.timestamp,
         }
     )
-    ctx.logger.info(f"  [V2] Swap {swap_id} created/updated for token {token.token_id}")
+    # ctx.logger.info(f"  [V2] Swap {swap_id} created/updated for token {token.token_id}")

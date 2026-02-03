@@ -47,4 +47,4 @@ async def on_swap_teia(
             'timestamp': transaction.data.timestamp,
         }
     )
-    ctx.logger.info(f"  [Teia] Swap {swap_id} created/updated for token {token.token_id}")
+    # ctx.logger.info(f"  [Teia] Swap {swap_id} created/updated for token {token.token_id}")

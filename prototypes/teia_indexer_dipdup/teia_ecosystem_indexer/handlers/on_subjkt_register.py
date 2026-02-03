@@ -48,4 +48,4 @@ async def on_subjkt_register(
     
     await holder.save()
 
-    ctx.logger.info(f"Registered subjkt: {name} URI: {uri} for {registry.data.sender_address}")
+    # ctx.logger.info(f"Registered subjkt: {name} URI: {uri} for {registry.data.sender_address}")

@@ -30,8 +30,8 @@ async def on_mint(
         }
     )
 
-    if not created:
-        ctx.logger.warning(f"Token {transaction.parameter.token_id} already exists, skipping create.")
+    # if not created:
+    #     ctx.logger.warning(f"Token {transaction.parameter.token_id} already exists, skipping create.")
 
     # Fire the metadata fetcher hook for this new token
     await ctx.fire_hook('fetch_metadata')

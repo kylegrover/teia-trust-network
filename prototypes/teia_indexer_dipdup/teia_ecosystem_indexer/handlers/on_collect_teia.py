@@ -42,7 +42,7 @@ async def on_collect_teia(
         price_mutez=swap.price_mutez,
         timestamp=transaction.data.timestamp,
     )
-    ctx.logger.info(f"  [Teia] Trade created: 1 item from swap {swap_id}")
+    # ctx.logger.info(f"  [Teia] Trade created: 1 item from swap {swap_id}")
 
     # In Teia/HEN, collect usually implies 1 item unless batching (which isn't this entrypoint)
     amount_collected = 1
@@ -61,4 +61,4 @@ async def on_collect_teia(
         price_mutez=swap.price_mutez,
         timestamp=transaction.data.timestamp,
     )
-    ctx.logger.info(f"  [Teia] Trade created for swap {swap_id}")
+    # ctx.logger.info(f"  [Teia] Trade created for swap {swap_id}")
