@@ -1,3 +1,4 @@
+import asyncio
 import aiohttp
 from dipdup.context import HookContext
 
@@ -5,9 +6,9 @@ from teia_ecosystem_indexer import models
 from teia_ecosystem_indexer import utils
 
 IPFS_GATEWAYS = [
-    'https://ipfs.io/ipfs/',
     'https://cloudflare-ipfs.com/ipfs/',
     'https://gateway.pinata.cloud/ipfs/',
+    'https://ipfs.io/ipfs/',
 ]
 
 
@@ -16,10 +17,10 @@ async def fetch_json_with_fallback(session: aiohttp.ClientSession, cid: str) -> 
     for gateway in IPFS_GATEWAYS:
         url = f'{gateway}{cid}'
         try:
-            async with session.get(url, timeout=5) as response:
+            # Lower timeout to prevent watchdog triggers
+            async with session.get(url, timeout=3) as response:
                 if response.status == 200:
                     data = await response.json()
-                    # Basic validation that we got a dict
                     if isinstance(data, dict):
                         return utils.clean_null_bytes(data)
         except Exception:
@@ -27,15 +28,26 @@ async def fetch_json_with_fallback(session: aiohttp.ClientSession, cid: str) -> 
     return None
 
 
+async def process_token_metadata(session: aiohttp.ClientSession, token: models.Token, ctx: HookContext):
+    cid = token.metadata_uri.replace('ipfs://', '')
+    data = await fetch_json_with_fallback(session, cid)
+    return token, cid, data
+
+
+async def process_holder_metadata(session: aiohttp.ClientSession, holder: models.Holder, ctx: HookContext):
+    cid = holder.metadata_uri.replace('ipfs://', '')
+    data = await fetch_json_with_fallback(session, cid)
+    return holder, cid, data
+
+
 async def fetch_metadata(ctx: HookContext) -> None:
     # 1. Collect unsynced entities
-    # Exclude CIDs that are already marked as ignored
     ignored_cids = await models.IgnoredCid.all().values_list('cid', flat=True)
 
     unsynced_tokens = (
         await models.Token.filter(metadata_synced=False, metadata_uri__startswith='ipfs://')
         .filter(metadata_uri__not_in=[f'ipfs://{cid}' for cid in ignored_cids])
-        .limit(10)
+        .limit(20)
         .all()
     )
 
@@ -50,13 +62,17 @@ async def fetch_metadata(ctx: HookContext) -> None:
         return
 
     async with aiohttp.ClientSession() as session:
-        # --- Handle Tokens ---
-        for token in unsynced_tokens:
-            cid = token.metadata_uri.replace('ipfs://', '')
-            data = await fetch_json_with_fallback(session, cid)
+        # Phase 1: Parallel IPFS Fetch (The slow part)
+        token_tasks = [process_token_metadata(session, t, ctx) for t in unsynced_tokens]
+        holder_tasks = [process_holder_metadata(session, h, ctx) for h in unsynced_holders]
+        
+        token_results = await asyncio.gather(*token_tasks)
+        holder_results = await asyncio.gather(*holder_tasks)
 
+        # Phase 2: Sequential DB Write (The safe part)
+        # We do this one-by-one to avoid asyncpg 'another operation in progress' errors
+        for token, cid, data in token_results:
             if data:
-                # Extract rich fields
                 mime = ''
                 formats = data.get('formats', [])
                 if formats and isinstance(formats, list) and len(formats) > 0 and 'mimeType' in formats[0]:
@@ -75,7 +91,6 @@ async def fetch_metadata(ctx: HookContext) -> None:
                     },
                 )
 
-                # Extract Tags (Hicdex logic)
                 raw_tags = data.get('tags', [])
                 if isinstance(raw_tags, list):
                     for tag_name in raw_tags:
@@ -84,24 +99,16 @@ async def fetch_metadata(ctx: HookContext) -> None:
                         tag_name = tag_name.lower().strip()
                         if not tag_name:
                             continue
-
                         tag_obj, _ = await models.Tag.get_or_create(name=tag_name)
                         await models.TokenTag.get_or_create(token=token, tag=tag_obj)
-
-                token.metadata_synced = True
-                await token.save()
-                # ctx.logger.info('Fetched metadata for Token %s', token.token_id)
             else:
-                ctx.logger.warning('Failed all IPFS gateways for token %s (%s). Skipping.', token.token_id, cid)
+                ctx.logger.warning('Failed IPFS gateways for token %s (%s). Skipping.', token.token_id, cid)
                 await models.IgnoredCid.get_or_create(cid=cid, defaults={'reason': 'Gateway timeout'})
-                token.metadata_synced = True
-                await token.save()
 
-        # --- Handle Holders (User Profiles) ---
-        for holder in unsynced_holders:
-            cid = holder.metadata_uri.replace('ipfs://', '')
-            data = await fetch_json_with_fallback(session, cid)
+            token.metadata_synced = True
+            await token.save()
 
+        for holder, cid, data in holder_results:
             if data:
                 await models.HolderMetadata.update_or_create(
                     holder=holder,
@@ -112,11 +119,9 @@ async def fetch_metadata(ctx: HookContext) -> None:
                         'logo': data.get('logo') or data.get('avatar'),
                     },
                 )
-                holder.metadata_synced = True
-                await holder.save()
-                # ctx.logger.info('Fetched metadata for Holder %s (%s)', holder.name, holder.address)
             else:
-                ctx.logger.warning('Failed all IPFS gateways for holder %s. Skipping.', holder.address)
+                ctx.logger.warning('Failed IPFS gateways for holder %s (%s). Skipping.', holder.address, cid)
                 await models.IgnoredCid.get_or_create(cid=cid, defaults={'reason': 'Gateway timeout'})
-                holder.metadata_synced = True
-                await holder.save()
+
+            holder.metadata_synced = True
+            await holder.save()

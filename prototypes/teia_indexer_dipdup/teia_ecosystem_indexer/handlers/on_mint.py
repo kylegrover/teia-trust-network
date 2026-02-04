@@ -34,6 +34,3 @@ async def on_mint(
     holder_holding, _ = await models.TokenHolder.get_or_create(token=token, holder=creator_holder)
     holder_holding.quantity += int(transaction.parameter.amount)
     await holder_holding.save()
-
-    # Fire the metadata fetcher hook for this new token
-    await ctx.fire_hook('fetch_metadata')
