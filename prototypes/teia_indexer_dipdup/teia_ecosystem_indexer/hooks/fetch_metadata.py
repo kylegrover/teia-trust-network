@@ -63,11 +63,18 @@ async def fetch_metadata(ctx: HookContext) -> None:
 
     async with aiohttp.ClientSession() as session:
         # Phase 1: Parallel IPFS Fetch (The slow part)
-        token_tasks = [process_token_metadata(session, t, ctx) for t in unsynced_tokens]
-        holder_tasks = [process_holder_metadata(session, h, ctx) for h in unsynced_holders]
+        # We gather everything at once so all coroutines are awaited even if some fail.
+        tasks = []
+        tasks.extend([process_token_metadata(session, t, ctx) for t in unsynced_tokens])
+        tasks.extend([process_holder_metadata(session, h, ctx) for h in unsynced_holders])
         
-        token_results = await asyncio.gather(*token_tasks)
-        holder_results = await asyncio.gather(*holder_tasks)
+        if not tasks:
+            return
+
+        all_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        token_results = [r for r in all_results if isinstance(r, tuple) and isinstance(r[0], models.Token)]
+        holder_results = [r for r in all_results if isinstance(r, tuple) and isinstance(r[0], models.Holder)]
 
         # Phase 2: Sequential DB Write (The safe part)
         # We do this one-by-one to avoid asyncpg 'another operation in progress' errors
