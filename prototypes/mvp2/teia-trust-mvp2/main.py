@@ -38,25 +38,19 @@ class TrustResponse(BaseModel):
     reason: str
 
 async def get_profile(address_or_id: str | int) -> Profile:
-    # 1. Fetch metadata from INDEX DB
+    # 1. Fetch metadata from INDEX DB - Keep it simple, just holder table
     async with get_index_conn() as conn:
         if isinstance(address_or_id, str) and address_or_id.startswith('tz'):
             h_row = await conn.fetchrow("""
-                SELECT h.id, h.address, 
-                       COALESCE(h.name, m.alias, m.content->>'name', m.content->>'alias') as alias, 
-                       COALESCE(m.logo, m.content->>'logo', m.content->>'identicon') as logo
-                FROM holder h
-                LEFT JOIN holder_metadata m ON h.id = m.holder_id
-                WHERE h.address = $1
+                SELECT id, address, name
+                FROM holder
+                WHERE address = $1
             """, address_or_id)
         else:
             h_row = await conn.fetchrow("""
-                SELECT h.id, h.address, 
-                       COALESCE(h.name, m.alias, m.content->>'name', m.content->>'alias') as alias, 
-                       COALESCE(m.logo, m.content->>'logo', m.content->>'identicon') as logo
-                FROM holder h
-                LEFT JOIN holder_metadata m ON h.id = m.holder_id
-                WHERE h.id = $1
+                SELECT id, address, name
+                FROM holder
+                WHERE id = $1
             """, int(address_or_id))
     
     if not h_row:
@@ -71,8 +65,8 @@ async def get_profile(address_or_id: str | int) -> Profile:
     return Profile(
         address=h_row['address'],
         id=h_row['id'],
-        alias=h_row['alias'],
-        logo=format_logo_url(h_row['logo']),
+        alias=h_row['name'],
+        logo=None, # Skipping metadata fetching per request
         score=s_row['score'] if s_row else 0.0,
         rank=s_row['rank'] if s_row else None
     )
@@ -146,29 +140,28 @@ async def get_graph(address: str):
         
         # 3. Resolve metadata (from index)
         nodes_metadata = await idx_conn.fetch("""
-            SELECT h.id, h.address, 
-                   COALESCE(h.name, m.alias, m.content->>'name', m.content->>'alias') as alias, 
-                   COALESCE(m.logo, m.content->>'logo', m.content->>'identicon') as logo
-            FROM holder h
-            LEFT JOIN holder_metadata m ON h.id = m.holder_id
-            WHERE h.id = ANY($1)
+            SELECT id, address, name
+            FROM holder
+            WHERE id = ANY($1)
         """, target_ids)
     
     # 4. Resolve scores (from app db)
     async with get_app_conn() as app_conn:
         scores_rows = await app_conn.fetch("""
-            SELECT holder_id, score FROM trust_scores WHERE holder_id = ANY($1)
+            SELECT holder_id, score, rank FROM trust_scores WHERE holder_id = ANY($1)
         """, target_ids)
-        score_map = {r['holder_id']: r['score'] for r in scores_rows}
+        score_map = {r['holder_id']: (r['score'], r['rank']) for r in scores_rows}
     
     return {
         "nodes": [
             {
                 "id": n['id'], 
-                "label": n['alias'] or n['address'][:6], 
+                "label": n['name'] or n['address'][:6], 
                 "title": n['address'],
-                "image": format_logo_url(n['logo']),
-                "value": score_map.get(n['id'], 1.0),
+                "name": n['name'],
+                "address": n['address'],
+                "score": score_map.get(n['id'], (0.0, None))[0],
+                "rank": score_map.get(n['id'], (0.0, None))[1],
                 "group": "center" if n['id'] == center.id else "collector"
             } for n in nodes_metadata
         ],

@@ -12,6 +12,15 @@
         button:hover { background: #1d4ed8; }
         .legend { font-size: 0.8em; color: #94a3b8; margin-left: auto; }
         span.dot { height: 10px; width: 10px; display: inline-block; border-radius: 50%; margin-right: 5px; }
+
+        /* Modal Styles */
+        #modal { display: none; position: fixed; z-index: 10; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); }
+        .modal-content { background: #1e293b; margin: 15% auto; padding: 20px; border: 1px solid #334155; width: 400px; border-radius: 8px; position: relative; }
+        .modal-header { font-size: 1.2em; font-weight: bold; margin-bottom: 15px; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+        .modal-body div { margin-bottom: 15px; }
+        .modal-body label { color: #94a3b8; display: block; font-size: 0.8em; margin-bottom: 4px; }
+        .close { position: absolute; right: 20px; top: 15px; cursor: pointer; color: #94a3b8; }
+        .btn-copy { background: #475569; font-size: 0.7em; margin-left: 5px; padding: 4px 8px; }
     </style>
 </head>
 <body>
@@ -29,7 +38,25 @@
 
 <div id="mynetwork"></div>
 
+<div id="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <div class="modal-header">Profile Info</div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
 <script type="text/javascript">
+    function closeModal() { document.getElementById('modal').style.display = 'none'; }
+    function copyText(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = "Copied!";
+            setTimeout(() => btn.innerText = originalText, 1000);
+        });
+    }
+
     async function drawGraph() {
         const center = document.getElementById('centerNode').value.trim();
         if(!center) return alert("Please enter a address or ID");
@@ -42,20 +69,15 @@
             
             // Map groups to colors & handle images
             const nodes = data.nodes.map(n => {
-                const hasImage = n.image && n.image.startsWith('http');
                 return {
                     ...n,
-                    shape: hasImage ? 'circularImage' : 'dot',
-                    image: hasImage ? {
-                        unselected: n.image,
-                        selected: n.image
-                    } : undefined,
+                    shape: 'dot',
                     color: n.group === 'center' ? '#eab308' : (n.group === 'collector' ? '#4ade80' : '#64748b'),
-                    size: 20 + (Math.sqrt(n.value) * 10), // Significantly larger nodes
+                    size: 10 + (Math.sqrt(n.score || 0) * 3), 
                     font: {
                         size: n.group === 'center' ? 16 : 12,
                         weight: n.group === 'center' ? 'bold' : 'normal',
-                        vadjust: 35 // Consistently push text below the node
+                        vadjust: 5 
                     },
                     borderWidth: n.group === 'center' ? 4 : 2
                 };
@@ -78,15 +100,15 @@
                     color: { color: 'rgba(71, 85, 105, 0.4)', highlight: '#2563eb' }, 
                     arrows: { to: { enabled: true, scaleFactor: 0.5 } },
                     scaling: { min: 1, max: 10 },
-                    smooth: { enabled: true, type: 'curvedCW', roundness: 0.2 } // Add some curve to edges
+                    smooth: { enabled: true, type: 'curvedCW', roundness: 0.2 } 
                 },
                 physics: { 
                     enabled: true,
                     solver: 'forceAtlas2Based',
                     forceAtlas2Based: {
-                        gravitationalConstant: -120, // More repulsion
-                        centralGravity: 0.025,        // Much stronger central pull (tighter graph)
-                        springLength: 100,            // Shorter springs (tighter graph)
+                        gravitationalConstant: -100, 
+                        centralGravity: 0.02,
+                        springLength: 90,
                         springConstant: 0.08,
                         damping: 0.4,
                         avoidOverlap: 1
@@ -103,15 +125,20 @@
 
             const network = new vis.Network(container, graphData, options);
 
-            // Double click to copy address
-            network.on("doubleClick", function (params) {
+            // Click to show modal
+            network.on("click", function (params) {
                 if (params.nodes.length > 0) {
                     const nodeId = params.nodes[0];
-                    const node = nodes.find(n => n.id === nodeId);
-                    if (node && node.title) {
-                        navigator.clipboard.writeText(node.title).then(() => {
-                            alert("Copied address: " + node.title);
-                        });
+                    const node = nodes.find(nx => nx.id === nodeId);
+                    if (node) {
+                        const body = document.getElementById('modalBody');
+                        body.innerHTML = `
+                            <div><label>Name</label><span>${node.name || 'Anonymous'}</span><button class="btn-copy" onclick="copyText('${node.name || ''}')">Copy</button></div>
+                            <div><label>Address</label><span style="font-size:0.8em">${node.address}</span><button class="btn-copy" onclick="copyText('${node.address}')">Copy</button></div>
+                            <div><label>Trust Score</label><span>${(node.score || 0).toFixed(2)}</span></div>
+                            <div><label>Network Rank</label><span># ${node.rank || 'N/A'}</span></div>
+                        `;
+                        document.getElementById('modal').style.display = 'block';
                     }
                 }
             });
