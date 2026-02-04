@@ -20,6 +20,7 @@ class Profile(BaseModel):
     logo: Optional[str]
     score: float
     rank: Optional[int]
+    role: Optional[str] = "collector"
 
 def format_logo_url(logo: Optional[str]) -> Optional[str]:
     if not logo:
@@ -42,20 +43,32 @@ async def get_profile(address_or_id: str | int) -> Profile:
     async with get_index_conn() as conn:
         if isinstance(address_or_id, str) and address_or_id.startswith('tz'):
             h_row = await conn.fetchrow("""
-                SELECT id, address, name
-                FROM holder
-                WHERE address = $1
+                SELECT h.id, h.address, h.name, 
+                       (SELECT COUNT(*) FROM token t WHERE t.creator_id = h.id LIMIT 1) > 0 as is_artist,
+                       (SELECT SUM(trade_count) FROM trust_connections tc WHERE tc.source_id = h.id) as total_buys,
+                       h.first_seen < '2021-06-01'::timestamp as is_og
+                FROM holder h
+                WHERE h.address = $1
             """, address_or_id)
         else:
             h_row = await conn.fetchrow("""
-                SELECT id, address, name
-                FROM holder
-                WHERE id = $1
+                SELECT h.id, h.address, h.name,
+                       (SELECT COUNT(*) FROM token t WHERE t.creator_id = h.id LIMIT 1) > 0 as is_artist,
+                       (SELECT SUM(trade_count) FROM trust_connections tc WHERE tc.source_id = h.id) as total_buys,
+                       h.first_seen < '2021-06-01'::timestamp as is_og
+                FROM holder h
+                WHERE h.id = $1
             """, int(address_or_id))
     
     if not h_row:
         raise HTTPException(status_code=404, detail="Holder not found")
     
+    role = "collector"
+    if h_row['is_artist']: role = "artist"
+    if (h_row['total_buys'] or 0) > 500: role = "whale"
+    if h_row['is_og']: role = "og" 
+    if h_row['is_artist'] and h_row['is_og']: role = "og_artist"
+
     # 2. Fetch scores from APP DB
     async with get_app_conn() as conn:
         s_row = await conn.fetchrow("""
@@ -66,9 +79,10 @@ async def get_profile(address_or_id: str | int) -> Profile:
         address=h_row['address'],
         id=h_row['id'],
         alias=h_row['name'],
-        logo=None, # Skipping metadata fetching per request
+        logo=None, 
         score=s_row['score'] if s_row else 0.0,
-        rank=s_row['rank'] if s_row else None
+        rank=s_row['rank'] if s_row else None,
+        role=role
     )
 
 @app.get("/trust/{observer_address}/{target_address}", response_model=TrustResponse)
@@ -119,58 +133,90 @@ async def get_graph(address: str):
     center = await get_profile(address)
     
     async with get_index_conn() as idx_conn:
-        # 1. Direct connections from center (from index)
-        first_degree = await idx_conn.fetch("""
+        # 1. First Degree - People center bought from
+        first_degree_rows = await idx_conn.fetch("""
             SELECT target_id, trade_count 
             FROM trust_connections 
             WHERE source_id = $1 
             ORDER BY trade_count DESC 
-            LIMIT 150
+            LIMIT 100
         """, center.id)
         
-        target_ids = [r['target_id'] for r in first_degree]
-        target_ids.append(center.id)
+        first_degree_ids = [r['target_id'] for r in first_degree_rows]
         
-        # 2. Get edges between these people (from index)
-        edges_rows = await idx_conn.fetch("""
-            SELECT source_id, target_id, trade_count 
-            FROM trust_connections 
-            WHERE source_id = ANY($1) AND target_id = ANY($1)
-        """, target_ids)
+        # 2. Second Degree - People the first degree people bought from (Discovery)
+        # We limit each neighbor to their top 5 to keep the graph manageable
+        second_degree_rows = await idx_conn.fetch("""
+            SELECT target_id, source_id, trade_count 
+            FROM (
+                SELECT target_id, source_id, trade_count,
+                       ROW_NUMBER() OVER(PARTITION BY source_id ORDER BY trade_count DESC) as rank
+                FROM trust_connections
+                WHERE source_id = ANY($1)
+            ) as sub
+            WHERE rank <= 5
+            LIMIT 200
+        """, first_degree_ids)
         
-        # 3. Resolve metadata (from index)
+        all_target_ids = list(set(first_degree_ids + [r['target_id'] for r in second_degree_rows] + [center.id]))
+        
+        # 3. Resolve metadata and roles for all nodes in view
         nodes_metadata = await idx_conn.fetch("""
-            SELECT id, address, name
-            FROM holder
-            WHERE id = ANY($1)
-        """, target_ids)
+            SELECT h.id, h.address, h.name,
+                   (SELECT COUNT(*) FROM token t WHERE t.creator_id = h.id LIMIT 1) > 0 as is_artist,
+                   (SELECT SUM(trade_count) FROM trust_connections tc WHERE tc.source_id = h.id) as total_buys,
+                   h.first_seen < '2021-06-01'::timestamp as is_og
+            FROM holder h
+            WHERE h.id = ANY($1)
+        """, all_target_ids)
     
     # 4. Resolve scores (from app db)
     async with get_app_conn() as app_conn:
         scores_rows = await app_conn.fetch("""
             SELECT holder_id, score, rank FROM trust_scores WHERE holder_id = ANY($1)
-        """, target_ids)
+        """, all_target_ids)
         score_map = {r['holder_id']: (r['score'], r['rank']) for r in scores_rows}
-    
+
+    # Helper to calculate role
+    def get_role(row):
+        if row['is_artist'] and row['is_og']: return "og_artist"
+        if row['is_artist']: return "artist"
+        if (row['total_buys'] or 0) > 500: return "whale"
+        if row['is_og']: return "og"
+        return "collector"
+
+    # 5. Build Final Node List
+    nodes = []
+    for n in nodes_metadata:
+        role = get_role(n)
+        s, r = score_map.get(n['id'], (0.0, None))
+        nodes.append({
+            "id": n['id'],
+            "label": n['name'] or n['address'][:6],
+            "title": n['address'],
+            "name": n['name'],
+            "address": n['address'],
+            "score": s,
+            "rank": r,
+            "role": role,
+            "group": "center" if n['id'] == center.id else ("1st" if n['id'] in first_degree_ids else "2nd")
+        })
+
+    # 6. Build All Edges in view
+    async with get_index_conn() as idx_conn:
+        all_edges = await idx_conn.fetch("""
+            SELECT source_id, target_id, trade_count 
+            FROM trust_connections 
+            WHERE source_id = ANY($1) AND target_id = ANY($1)
+        """, all_target_ids)
+
     return {
-        "nodes": [
-            {
-                "id": n['id'], 
-                "label": n['name'] or n['address'][:6], 
-                "title": n['address'],
-                "name": n['name'],
-                "address": n['address'],
-                "score": score_map.get(n['id'], (0.0, None))[0],
-                "rank": score_map.get(n['id'], (0.0, None))[1],
-                "group": "center" if n['id'] == center.id else "collector"
-            } for n in nodes_metadata
-        ],
+        "nodes": nodes,
         "edges": [
             {
                 "from": e['source_id'], 
                 "to": e['target_id'], 
-                "value": e['trade_count'],
-                "arrows": "to"
-            } for e in edges_rows
+                "value": e['trade_count']
+            } for e in all_edges
         ]
     }

@@ -68,12 +68,24 @@
                 throw new Error("No graph data found for this address.");
             }
             
-            // Map schema
-            const gData = {
-                nodes: rawData.nodes.map(n => ({
+            // Map schema & roles to colors
+            const nodes = rawData.nodes.map(n => {
+                let color = '#64748b'; // default collector (slate)
+                if (n.role === 'artist') color = '#ec4899'; // pink
+                if (n.role === 'whale') color = '#3b82f6';  // blue
+                if (n.role === 'og') color = '#8b5cf6';    // purple
+                if (n.role === 'og_artist') color = '#f43f5e'; // rose/red
+                if (n.group === 'center') color = '#eab308'; // gold
+
+                return {
                     ...n,
-                    id: String(n.id)
-                })),
+                    id: String(n.id),
+                    color: color
+                }
+            });
+
+            const gData = {
+                nodes: nodes,
                 links: rawData.edges.map(e => ({
                     source: String(e.from),
                     target: String(e.to),
@@ -92,8 +104,8 @@
                 .nodeId('id')
                 // NodeVal determines the hover/collision area
                 .nodeVal(n => Math.sqrt(n.score || 1) * 0.5 + 2) 
-                .nodeLabel(n => `${n.name || n.address}<br>Rank: #${n.rank || '??'}<br>Score: ${n.score?.toFixed(2)}`)
-                .nodeColor(n => n.group === 'center' ? '#eab308' : (n.group === 'collector' ? '#4ade80' : '#64748b'))
+                .nodeLabel(n => `${n.name || n.address}<br>Role: ${n.role}<br>Rank: #${n.rank || '??'}<br>Score: ${n.score?.toFixed(2)}`)
+                .nodeColor(n => n.color)
                 .linkWidth(l => Math.log1p(l.value || 1))
                 .linkColor(() => 'rgba(148, 163, 184, 0.2)')
                 .linkDirectionalArrowLength(3)
@@ -103,6 +115,7 @@
                     body.innerHTML = `
                         <div><label>Name</label><span>${node.name || 'Anonymous'}</span><button class="btn-copy" onclick="copyText('${node.name || ''}')">Copy</button></div>
                         <div><label>Address</label><span style="font-size:0.8em">${node.address}</span><button class="btn-copy" onclick="copyText('${node.address}')">Copy</button></div>
+                        <div><label>Market Role</label><span style="text-transform: capitalize; font-weight: bold; color: ${node.color}">${node.role.replace('_', ' ')}</span></div>
                         <div><label>Trust Score</label><span>${(node.score || 0).toFixed(2)}</span></div>
                         <div><label>Network Rank</label><span># ${node.rank || 'N/A'}</span></div>
                     `;
@@ -119,14 +132,16 @@
                     // Node Circle
                     ctx.beginPath();
                     ctx.arc(node.x, node.y, r, 0, 2 * Math.PI, false);
-                    ctx.fillStyle = node.group === 'center' ? '#eab308' : (node.group === 'collector' ? '#4ade80' : '#64748b');
+                    ctx.fillStyle = node.color;
                     ctx.fill();
                     
-                    // Selection Ring
-                    if (node.group === 'center') {
+                    // Selection/Role Indicator
+                    if (node.group === 'center' || node.role.includes('og')) {
                         ctx.strokeStyle = '#ffffff';
+                        ctx.setLineDash(node.role.includes('og') ? [2, 2] : []); // Dash for OGs
                         ctx.lineWidth = 1/globalScale;
                         ctx.stroke();
+                        ctx.setLineDash([]); // reset
                     }
 
                     // Text
