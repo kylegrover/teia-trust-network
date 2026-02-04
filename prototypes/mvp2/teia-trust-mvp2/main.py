@@ -21,6 +21,14 @@ class Profile(BaseModel):
     score: float
     rank: Optional[int]
 
+def format_logo_url(logo: Optional[str]) -> Optional[str]:
+    if not logo:
+        # Fallback to identicon service if no logo exists
+        return None
+    if logo.startswith('ipfs://'):
+        return logo.replace('ipfs://', 'https://cloudflare-ipfs.com/ipfs/')
+    return logo
+
 class TrustResponse(BaseModel):
     observer: Profile
     target: Profile
@@ -34,14 +42,18 @@ async def get_profile(address_or_id: str | int) -> Profile:
     async with get_index_conn() as conn:
         if isinstance(address_or_id, str) and address_or_id.startswith('tz'):
             h_row = await conn.fetchrow("""
-                SELECT h.id, h.address, m.alias, m.logo
+                SELECT h.id, h.address, 
+                       COALESCE(h.name, m.alias, m.content->>'name', m.content->>'alias') as alias, 
+                       COALESCE(m.logo, m.content->>'logo', m.content->>'identicon') as logo
                 FROM holder h
                 LEFT JOIN holder_metadata m ON h.id = m.holder_id
                 WHERE h.address = $1
             """, address_or_id)
         else:
             h_row = await conn.fetchrow("""
-                SELECT h.id, h.address, m.alias, m.logo
+                SELECT h.id, h.address, 
+                       COALESCE(h.name, m.alias, m.content->>'name', m.content->>'alias') as alias, 
+                       COALESCE(m.logo, m.content->>'logo', m.content->>'identicon') as logo
                 FROM holder h
                 LEFT JOIN holder_metadata m ON h.id = m.holder_id
                 WHERE h.id = $1
@@ -60,7 +72,7 @@ async def get_profile(address_or_id: str | int) -> Profile:
         address=h_row['address'],
         id=h_row['id'],
         alias=h_row['alias'],
-        logo=h_row['logo'],
+        logo=format_logo_url(h_row['logo']),
         score=s_row['score'] if s_row else 0.0,
         rank=s_row['rank'] if s_row else None
     )
@@ -134,7 +146,9 @@ async def get_graph(address: str):
         
         # 3. Resolve metadata (from index)
         nodes_metadata = await idx_conn.fetch("""
-            SELECT h.id, h.address, m.alias, m.logo
+            SELECT h.id, h.address, 
+                   COALESCE(h.name, m.alias, m.content->>'name', m.content->>'alias') as alias, 
+                   COALESCE(m.logo, m.content->>'logo', m.content->>'identicon') as logo
             FROM holder h
             LEFT JOIN holder_metadata m ON h.id = m.holder_id
             WHERE h.id = ANY($1)
@@ -153,6 +167,7 @@ async def get_graph(address: str):
                 "id": n['id'], 
                 "label": n['alias'] or n['address'][:6], 
                 "title": n['address'],
+                "image": format_logo_url(n['logo']),
                 "value": score_map.get(n['id'], 1.0),
                 "group": "center" if n['id'] == center.id else "collector"
             } for n in nodes_metadata

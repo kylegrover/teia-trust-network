@@ -40,12 +40,26 @@
             
             const container = document.getElementById('mynetwork');
             
-            // Map groups to colors
-            const nodes = data.nodes.map(n => ({
-                ...n,
-                color: n.group === 'center' ? '#eab308' : (n.group === 'collector' ? '#4ade80' : '#64748b'),
-                size: 10 + (Math.sqrt(n.value) * 5) // Scale based on PageRank
-            }));
+            // Map groups to colors & handle images
+            const nodes = data.nodes.map(n => {
+                const hasImage = n.image && n.image.startsWith('http');
+                return {
+                    ...n,
+                    shape: hasImage ? 'circularImage' : 'dot',
+                    image: hasImage ? {
+                        unselected: n.image,
+                        selected: n.image
+                    } : undefined,
+                    color: n.group === 'center' ? '#eab308' : (n.group === 'collector' ? '#4ade80' : '#64748b'),
+                    size: 20 + (Math.sqrt(n.value) * 10), // Significantly larger nodes
+                    font: {
+                        size: n.group === 'center' ? 16 : 12,
+                        weight: n.group === 'center' ? 'bold' : 'normal',
+                        vadjust: 35 // Consistently push text below the node
+                    },
+                    borderWidth: n.group === 'center' ? 4 : 2
+                };
+            });
 
             const graphData = {
                 nodes: new vis.DataSet(nodes),
@@ -54,30 +68,32 @@
 
             const options = {
                 nodes: { 
-                    shape: 'dot', 
-                    font: { color: '#f8fafc', size: 12, strokeWidth: 2, strokeColor: '#000000' },
-                    scaling: { label: { enabled: true } }
+                    font: { color: '#f8fafc', strokeWidth: 2, strokeColor: '#000000' },
+                    scaling: { label: { enabled: true } },
+                    borderWidth: 2,
+                    shadow: true
                 },
                 edges: { 
                     width: 1, 
                     color: { color: 'rgba(71, 85, 105, 0.4)', highlight: '#2563eb' }, 
                     arrows: { to: { enabled: true, scaleFactor: 0.5 } },
-                    scaling: { min: 1, max: 10 }
+                    scaling: { min: 1, max: 10 },
+                    smooth: { enabled: true, type: 'curvedCW', roundness: 0.2 } // Add some curve to edges
                 },
                 physics: { 
                     enabled: true,
                     solver: 'forceAtlas2Based',
                     forceAtlas2Based: {
-                        gravitationalConstant: -100,
-                        centralGravity: 0.01,
-                        springLength: 100,
+                        gravitationalConstant: -120, // More repulsion
+                        centralGravity: 0.025,        // Much stronger central pull (tighter graph)
+                        springLength: 100,            // Shorter springs (tighter graph)
                         springConstant: 0.08,
                         damping: 0.4,
                         avoidOverlap: 1
                     },
                     stabilization: {
                         enabled: true,
-                        iterations: 200,
+                        iterations: 300,
                         updateInterval: 25
                     },
                     adaptiveTimestep: true,
@@ -86,6 +102,19 @@
             };
 
             const network = new vis.Network(container, graphData, options);
+
+            // Double click to copy address
+            network.on("doubleClick", function (params) {
+                if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    const node = nodes.find(n => n.id === nodeId);
+                    if (node && node.title) {
+                        navigator.clipboard.writeText(node.title).then(() => {
+                            alert("Copied address: " + node.title);
+                        });
+                    }
+                }
+            });
 
             // Stop physics once stabilized to prevent jitter
             network.on("stabilized", function (params) {
