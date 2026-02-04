@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teia Trust Graph MVP2 (Force-Graph)</title>
+    <script src="https://unpkg.com/force-graph"></script>
+    <style>
+        body { background: #0f172a; color: #f8fafc; font-family: monospace; margin: 0; overflow: hidden; }
+        #controls { height: 60px; padding: 10px 20px; background: #1e293b; border-bottom: 1px solid #334155; display: flex; gap: 10px; align-items: center; }
+        #graph-container { width: 100vw; height: calc(100vh - 81px); background: #0f172a; }
+        input { background: #334155; border: 1px solid #475569; color: white; padding: 10px; min-width: 350px; border-radius: 4px; }
+        button { background: #2563eb; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-weight: bold;}
+        button:hover { background: #1d4ed8; }
+        
+        /* Modal Styles */
+        #modal { display: none; position: fixed; z-index: 10; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); }
+        .modal-content { background: #1e293b; margin: 15% auto; padding: 20px; border: 1px solid #334155; width: 400px; border-radius: 8px; position: relative; }
+        .modal-header { font-size: 1.2em; font-weight: bold; margin-bottom: 15px; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+        .modal-body div { margin-bottom: 15px; }
+        .modal-body label { color: #94a3b8; display: block; font-size: 0.8em; margin-bottom: 4px; }
+        .close { position: absolute; right: 20px; top: 15px; cursor: pointer; color: #94a3b8; }
+        .btn-copy { background: #475569; font-size: 0.7em; margin-left: 5px; padding: 4px 8px; color: white; border: none; border-radius: 3px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div id="controls">
+    <label>Center:</label>
+    <input type="text" id="centerNode" placeholder="tz... or id" value="">
+    <button onclick="drawGraph()">Visualize Trust</button>
+</div>
+
+<div id="graph-container"></div>
+
+<div id="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <div class="modal-header">Profile Info</div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+    let graph;
+
+    function closeModal() { document.getElementById('modal').style.display = 'none'; }
+    function copyText(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = "Copied!";
+            setTimeout(() => btn.innerText = originalText, 1000);
+        });
+    }
+
+    async function drawGraph() {
+        const centerInput = document.getElementById('centerNode').value.trim();
+        if(!centerInput) return alert("Please enter an address or ID");
+
+        try {
+            const res = await fetch(`http://127.0.0.1:8000/graph/${centerInput}`);
+            const rawData = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(rawData.detail || "API Error");
+            }
+
+            if (!rawData.nodes || rawData.nodes.length === 0) {
+                throw new Error("No graph data found for this address.");
+            }
+            
+            // Map schema
+            const gData = {
+                nodes: rawData.nodes.map(n => ({
+                    ...n,
+                    id: String(n.id)
+                })),
+                links: rawData.edges.map(e => ({
+                    source: String(e.from),
+                    target: String(e.to),
+                    value: e.value
+                }))
+            };
+
+            const elem = document.getElementById('graph-container');
+            if (graph) {
+                graph._destructor();
+                elem.innerHTML = '';
+            }
+
+            graph = ForceGraph()(elem)
+                .graphData(gData)
+                .nodeId('id')
+                // NodeVal determines the hover/collision area
+                .nodeVal(n => Math.sqrt(n.score || 1) * 0.5 + 2) 
+                .nodeLabel(n => `${n.name || n.address}<br>Rank: #${n.rank || '??'}<br>Score: ${n.score?.toFixed(2)}`)
+                .nodeColor(n => n.group === 'center' ? '#eab308' : (n.group === 'collector' ? '#4ade80' : '#64748b'))
+                .linkWidth(l => Math.log1p(l.value || 1))
+                .linkColor(() => 'rgba(148, 163, 184, 0.2)')
+                .linkDirectionalArrowLength(3)
+                .linkDirectionalArrowRelPos(1)
+                .onNodeClick(node => {
+                    const body = document.getElementById('modalBody');
+                    body.innerHTML = `
+                        <div><label>Name</label><span>${node.name || 'Anonymous'}</span><button class="btn-copy" onclick="copyText('${node.name || ''}')">Copy</button></div>
+                        <div><label>Address</label><span style="font-size:0.8em">${node.address}</span><button class="btn-copy" onclick="copyText('${node.address}')">Copy</button></div>
+                        <div><label>Trust Score</label><span>${(node.score || 0).toFixed(2)}</span></div>
+                        <div><label>Network Rank</label><span># ${node.rank || 'N/A'}</span></div>
+                    `;
+                    document.getElementById('modal').style.display = 'block';
+                })
+                .nodeCanvasObject((node, ctx, globalScale) => {
+                    const label = node.name || node.address.substring(0, 6);
+                    const fontSize = 14/globalScale;
+                    ctx.font = `${fontSize}px monospace`;
+                    
+                    // Node radius - scaled down to prevent overlap
+                    const r = Math.sqrt(node.score || 1) * 0.8 + 2;
+                    
+                    // Node Circle
+                    ctx.beginPath();
+                    ctx.arc(node.x, node.y, r, 0, 2 * Math.PI, false);
+                    ctx.fillStyle = node.group === 'center' ? '#eab308' : (node.group === 'collector' ? '#4ade80' : '#64748b');
+                    ctx.fill();
+                    
+                    // Selection Ring
+                    if (node.group === 'center') {
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 1/globalScale;
+                        ctx.stroke();
+                    }
+
+                    // Text
+                    if (globalScale > 1.5) { // Only show labels when zoomed in somewhat
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillStyle = 'rgba(248, 250, 252, 0.8)';
+                        ctx.fillText(label, node.x, node.y + r + fontSize);
+                    }
+                });
+
+            // Physics Tuning
+            graph.d3Force('charge').strength(-200);
+            graph.d3Force('link').distance(70);
+            graph.d3Force('center').strength(0.1);
+            
+        } catch (e) {
+            console.error(e);
+            alert("Error: " + e.message);
+        }
+    }
+</script>
+</body>
+</html>

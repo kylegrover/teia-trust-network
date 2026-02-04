@@ -125,7 +125,7 @@ async def get_graph(address: str):
             FROM trust_connections 
             WHERE source_id = $1 
             ORDER BY trade_count DESC 
-            LIMIT 50
+            LIMIT 150
         """, center.id)
         
         target_ids = [r['target_id'] for r in first_degree]
