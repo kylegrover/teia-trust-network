@@ -86,7 +86,8 @@ class TokenHolder(Model):
     """Tracks the current quantity of a token held by an address."""
 
     id = fields.BigIntField(pk=True)
-    token = fields.ForeignKeyField('models.Token', related_name='holders')
+    # Redundant index avoided: 'token_id' index is covered by 'unique_together'
+    token = fields.ForeignKeyField('models.Token', related_name='holders', index=False)
     holder = fields.ForeignKeyField('models.Holder', related_name='holdings', index=True)
     quantity = fields.BigIntField(default=0)
 
@@ -127,8 +128,9 @@ class Tag(Model):
 
 class TokenTag(Model):
     id = fields.BigIntField(pk=True)
-    token = fields.ForeignKeyField('models.Token', related_name='tags')
-    tag = fields.ForeignKeyField('models.Tag', related_name='tokens')
+    # Redundant index avoided: 'token_id' index is covered by 'unique_together'
+    token = fields.ForeignKeyField('models.Token', related_name='tags', index=False)
+    tag = fields.ForeignKeyField('models.Tag', related_name='tokens', index=True)
 
     class Meta:
         unique_together = ('token', 'tag')
@@ -218,8 +220,9 @@ class SplitContract(Model):
 
 class Shareholder(Model):
     id = fields.BigIntField(pk=True)
-    split_contract = fields.ForeignKeyField('models.SplitContract', related_name='shareholders')
-    holder = fields.ForeignKeyField('models.Holder', related_name='shares')
+    # Redundant index avoided: 'split_contract_id' index is covered by 'unique_together'
+    split_contract = fields.ForeignKeyField('models.SplitContract', related_name='shareholders', index=False)
+    holder = fields.ForeignKeyField('models.Holder', related_name='shares', index=True)
     shares = fields.BigIntField()
     holder_type = fields.EnumField(ShareholderStatus, default=ShareholderStatus.BENEFACTOR)
 
@@ -229,8 +232,9 @@ class Shareholder(Model):
 
 class Signature(Model):
     id = fields.BigIntField(pk=True)
-    token = fields.ForeignKeyField('models.Token', related_name='signatures')
-    holder = fields.ForeignKeyField('models.Holder', related_name='signatures')
+    # Redundant index avoided: 'token_id' index is covered by 'unique_together'
+    token = fields.ForeignKeyField('models.Token', related_name='signatures', index=False)
+    holder = fields.ForeignKeyField('models.Holder', related_name='signatures', index=True)
 
     class Meta:
         unique_together = ('token', 'holder')

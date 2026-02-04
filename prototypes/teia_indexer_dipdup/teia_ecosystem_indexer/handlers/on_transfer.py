@@ -52,11 +52,17 @@ async def on_transfer(
             # Update Balances (TokenHolder ledger)
             sender_holding, _ = await models.TokenHolder.get_or_create(token=token, holder=from_holder)
             sender_holding.quantity -= amount
-            await sender_holding.save()
+            if sender_holding.quantity <= 0:
+                await sender_holding.delete()
+            else:
+                await sender_holding.save()
 
             receiver_holding, _ = await models.TokenHolder.get_or_create(token=token, holder=to_holder)
             receiver_holding.quantity += amount
-            await receiver_holding.save()
+            if receiver_holding.quantity > 0:
+                await receiver_holding.save()
+            else:
+                await receiver_holding.delete()
 
             # Supply tracking for burns
             if to_address == BURN_ADDRESS:
