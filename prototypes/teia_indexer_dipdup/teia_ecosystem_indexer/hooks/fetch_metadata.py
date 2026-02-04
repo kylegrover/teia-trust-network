@@ -92,7 +92,10 @@ async def fetch_metadata(ctx: HookContext) -> None:
                 await token.save()
                 # ctx.logger.info('Fetched metadata for Token %s', token.token_id)
             else:
-                ctx.logger.warning('Failed all IPFS gateways for token %s (%s)', token.token_id, cid)
+                ctx.logger.warning('Failed all IPFS gateways for token %s (%s). Skipping.', token.token_id, cid)
+                await models.IgnoredCid.get_or_create(cid=cid, defaults={'reason': 'Gateway timeout'})
+                token.metadata_synced = True
+                await token.save()
 
         # --- Handle Holders (User Profiles) ---
         for holder in unsynced_holders:
@@ -113,4 +116,7 @@ async def fetch_metadata(ctx: HookContext) -> None:
                 await holder.save()
                 # ctx.logger.info('Fetched metadata for Holder %s (%s)', holder.name, holder.address)
             else:
-                ctx.logger.warning('Failed all IPFS gateways for holder %s', holder.address)
+                ctx.logger.warning('Failed all IPFS gateways for holder %s. Skipping.', holder.address)
+                await models.IgnoredCid.get_or_create(cid=cid, defaults={'reason': 'Gateway timeout'})
+                holder.metadata_synced = True
+                await holder.save()
