@@ -53,12 +53,51 @@
             };
 
             const options = {
-                nodes: { shape: 'dot', font: { color: '#f8fafc', size: 12, strokeWidth: 2, strokeColor: '#000000' } },
-                edges: { width: 1, color: { color: '#475569', highlight: '#2563eb' }, arrows: { to: { enabled: true, scaleFactor: 0.5 } } },
-                physics: { stabilization: true, barnesHut: { gravitationalConstant: -2000, springLength: 100 } }
+                nodes: { 
+                    shape: 'dot', 
+                    font: { color: '#f8fafc', size: 12, strokeWidth: 2, strokeColor: '#000000' },
+                    scaling: { label: { enabled: true } }
+                },
+                edges: { 
+                    width: 1, 
+                    color: { color: 'rgba(71, 85, 105, 0.4)', highlight: '#2563eb' }, 
+                    arrows: { to: { enabled: true, scaleFactor: 0.5 } },
+                    scaling: { min: 1, max: 10 }
+                },
+                physics: { 
+                    enabled: true,
+                    solver: 'forceAtlas2Based',
+                    forceAtlas2Based: {
+                        gravitationalConstant: -100,
+                        centralGravity: 0.01,
+                        springLength: 100,
+                        springConstant: 0.08,
+                        damping: 0.4,
+                        avoidOverlap: 1
+                    },
+                    stabilization: {
+                        enabled: true,
+                        iterations: 200,
+                        updateInterval: 25
+                    },
+                    adaptiveTimestep: true,
+                    minVelocity: 0.75
+                }
             };
 
-            new vis.Network(container, graphData, options);
+            const network = new vis.Network(container, graphData, options);
+
+            // Stop physics once stabilized to prevent jitter
+            network.on("stabilized", function (params) {
+                console.log("Stabilization finished!");
+                network.setOptions({ physics: { enabled: false } });
+            });
+
+            // Re-enable physics if the user moves a node manually
+            network.on("dragStart", function (params) {
+                network.setOptions({ physics: { enabled: true } });
+            });
+
         } catch (e) {
             console.error(e);
             alert("Error fetching graph. Make sure the API is running.");
