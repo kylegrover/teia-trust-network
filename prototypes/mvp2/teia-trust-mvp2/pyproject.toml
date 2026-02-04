@@ -1,0 +1,14 @@
+[project]
+name = "teia-trust-mvp2"
+version = "0.1.0"
+description = "Teia Trust Network MVP2 - PostgreSQL Optimized"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "asyncpg",
+    "networkx",
+    "pydantic",
+]
+
+[tool.uv]
+managed = true
