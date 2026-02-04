@@ -2,14 +2,18 @@
 <html>
 <head>
     <title>Teia Trust Graph MVP2 (Force-Graph)</title>
+    <script src="https://unpkg.com/d3"></script>
     <script src="https://unpkg.com/force-graph"></script>
     <style>
         body { background: #0f172a; color: #f8fafc; font-family: monospace; margin: 0; overflow: hidden; }
         #controls { height: 60px; padding: 10px 20px; background: #1e293b; border-bottom: 1px solid #334155; display: flex; gap: 10px; align-items: center; }
-        #graph-container { width: 100vw; height: calc(100vh - 81px); background: #0f172a; }
+        #legend { position: absolute; bottom: 20px; left: 20px; background: rgba(30, 41, 59, 0.9); padding: 15px; border-radius: 8px; border: 1px solid #334155; z-index: 5; font-size: 0.8em; line-height: 1.6em; }
+        #graph-container { width: 100vw; height: calc(100vh - 80px); background: #0f172a; position: relative; min-height: 400px; }
         input { background: #334155; border: 1px solid #475569; color: white; padding: 10px; min-width: 350px; border-radius: 4px; }
         button { background: #2563eb; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-weight: bold;}
         button:hover { background: #1d4ed8; }
+        .legend-item { display: flex; align-items: center; gap: 8px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
         
         /* Modal Styles */
         #modal { display: none; position: fixed; z-index: 10; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); }
@@ -30,6 +34,18 @@
 </div>
 
 <div id="graph-container"></div>
+
+<div id="legend">
+    <div class="legend-item"><div class="dot" style="background: #eab308"></div> <span>Center Wallet</span></div>
+    <div class="legend-item"><div class="dot" style="background: #f43f5e"></div> <span>OG Artist (Early & Creator)</span></div>
+    <div class="legend-item"><div class="dot" style="background: #ec4899"></div> <span>Artist</span></div>
+    <div class="legend-item"><div class="dot" style="background: #3b82f6"></div> <span>Whale (>500 buys)</span></div>
+    <div class="legend-item"><div class="dot" style="background: #8b5cf6"></div> <span>OG Collector (2021)</span></div>
+    <div class="legend-item"><div class="dot" style="background: #64748b"></div> <span>Collector</span></div>
+    <div style="margin-top:8px; color: #94a3b8; font-size: 0.9em; border-top: 1px solid #334155; padding-top: 8px;">
+        Scroll to Zoom<br>Click nodes for profile
+    </div>
+</div>
 
 <div id="modal">
     <div class="modal-content">
@@ -84,31 +100,41 @@
                 }
             });
 
-            const gData = {
-                nodes: nodes,
-                links: rawData.edges.map(e => ({
+            const nodeIds = new Set(nodes.map(n => n.id));
+            const validLinks = rawData.edges
+                .filter(e => nodeIds.has(String(e.from)) && nodeIds.has(String(e.to)))
+                .map(e => ({
                     source: String(e.from),
                     target: String(e.to),
                     value: e.value
-                }))
+                }));
+
+            const gData = {
+                nodes: nodes,
+                links: validLinks
             };
 
             const elem = document.getElementById('graph-container');
             if (graph) {
-                graph._destructor();
+                graph.pauseAnimation();
                 elem.innerHTML = '';
             }
 
             graph = ForceGraph()(elem)
+                .width(elem.clientWidth)
+                .height(elem.clientHeight)
                 .graphData(gData)
                 .nodeId('id')
-                // NodeVal determines the hover/collision area
                 .nodeVal(n => Math.sqrt(n.score || 1) * 0.5 + 2) 
                 .nodeLabel(n => `${n.name || n.address}<br>Role: ${n.role}<br>Rank: #${n.rank || '??'}<br>Score: ${n.score?.toFixed(2)}`)
                 .nodeColor(n => n.color)
                 .linkWidth(l => Math.log1p(l.value || 1))
-                .linkColor(() => 'rgba(148, 163, 184, 0.2)')
-                .linkDirectionalArrowLength(3)
+                .linkColor(l => {
+                    // Highlight paths from the center
+                    if (l.source.id === rawData.nodes.find(n => n.group === 'center')?.id) return 'rgba(234, 179, 8, 0.4)';
+                    return 'rgba(148, 163, 184, 0.15)';
+                })
+                .linkDirectionalArrowLength(l => l.source.id === rawData.nodes.find(n => n.group === 'center')?.id ? 4 : 2)
                 .linkDirectionalArrowRelPos(1)
                 .onNodeClick(node => {
                     const body = document.getElementById('modalBody');
@@ -145,7 +171,7 @@
                     }
 
                     // Text
-                    if (globalScale > 1.5) { // Only show labels when zoomed in somewhat
+                    if (globalScale > 2.5) { // Show labels when zoomed in (higher threshold for cleaner view)
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillStyle = 'rgba(248, 250, 252, 0.8)';
@@ -153,10 +179,16 @@
                     }
                 });
 
-            // Physics Tuning
-            graph.d3Force('charge').strength(-200);
-            graph.d3Force('link').distance(70);
+            // Physics Tuning - Stiffer for more stable clusters
+            graph.d3Force('charge').strength(-150);
+            graph.d3Force('link').distance(l => 60 / Math.log1p(l.value || 1)); 
+            graph.d3Force('center', d3.forceCenter(elem.clientWidth / 2, elem.clientHeight / 2));
             graph.d3Force('center').strength(0.1);
+
+            // Zoom to fit after a short delay to allow initial layout
+            setTimeout(() => {
+                graph.zoomToFit(400, 50);
+            }, 500);
             
         } catch (e) {
             console.error(e);

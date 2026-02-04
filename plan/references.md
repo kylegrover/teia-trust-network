@@ -11,6 +11,9 @@ Teia
 - Teia Moderation Banlist: The source for flagged accounts.
     - 
 - teia hicdex fork: https://github.com/teia-community/hicdex/
+- teia teztok plugin:
+    https://github.com/teztok/indexer/tree/main/src/plugins/teia
+    this is the live data source used for teia ui currently feb 4 2026
 
 
 

@@ -133,19 +133,20 @@ async def get_graph(address: str):
     center = await get_profile(address)
     
     async with get_index_conn() as idx_conn:
-        # 1. First Degree - People center bought from
+        # 1. First Degree - People center directly supports
+        # Reduced limit for better performance/readability
         first_degree_rows = await idx_conn.fetch("""
             SELECT target_id, trade_count 
             FROM trust_connections 
             WHERE source_id = $1 
             ORDER BY trade_count DESC 
-            LIMIT 100
+            LIMIT 60
         """, center.id)
         
         first_degree_ids = [r['target_id'] for r in first_degree_rows]
         
-        # 2. Second Degree - People the first degree people bought from (Discovery)
-        # We limit each neighbor to their top 5 to keep the graph manageable
+        # 2. Second Degree - Social Discovery
+        # Only take the very top discovery nodes to avoid "Hairball" effect
         second_degree_rows = await idx_conn.fetch("""
             SELECT target_id, source_id, trade_count 
             FROM (
@@ -153,10 +154,12 @@ async def get_graph(address: str):
                        ROW_NUMBER() OVER(PARTITION BY source_id ORDER BY trade_count DESC) as rank
                 FROM trust_connections
                 WHERE source_id = ANY($1)
+                  AND target_id != $2 -- Don't link back to center as 'discovery'
+                  AND target_id != ANY($1) -- Don't count existing friends as 'discovery'
             ) as sub
-            WHERE rank <= 5
-            LIMIT 200
-        """, first_degree_ids)
+            WHERE rank <= 2 -- Only top 2 per first-degree contact
+            LIMIT 80
+        """, first_degree_ids, center.id)
         
         all_target_ids = list(set(first_degree_ids + [r['target_id'] for r in second_degree_rows] + [center.id]))
         
@@ -202,13 +205,22 @@ async def get_graph(address: str):
             "group": "center" if n['id'] == center.id else ("1st" if n['id'] in first_degree_ids else "2nd")
         })
 
-    # 6. Build All Edges in view
+    # 6. Build Simplified Edges
     async with get_index_conn() as idx_conn:
+        # CRITICAL: We must ensure BOTH source and target are in all_target_ids
+        # otherwise force-graph will throw "node not found" errors.
+        discovery_ids = [r['target_id'] for r in second_degree_rows]
         all_edges = await idx_conn.fetch("""
             SELECT source_id, target_id, trade_count 
             FROM trust_connections 
             WHERE source_id = ANY($1) AND target_id = ANY($1)
-        """, all_target_ids)
+              AND (
+                (source_id = $2 OR target_id = $2) -- Connections to center
+                OR (source_id = ANY($3) AND target_id = ANY($3)) -- Internal 1st degree connections
+                OR (target_id = ANY($4)) -- Connections OUT to discovery nodes
+              )
+              AND trade_count > 0
+        """, all_target_ids, center.id, first_degree_ids, discovery_ids)
 
     return {
         "nodes": nodes,
