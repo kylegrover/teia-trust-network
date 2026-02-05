@@ -213,18 +213,19 @@ async def get_graph(address: str):
 
         # 4. Fetch Tags for Artists in view
         artist_tags_map = {}
+        primary_tag_map = {}
         tag_rows = await idx_conn.fetch("""
-            SELECT creator_id, array_agg(tag) as tags
-            FROM (
-                SELECT creator_id, tag 
-                FROM artist_tags_summary 
-                WHERE creator_id = ANY($1)
-                ORDER BY usage_count DESC
-            ) as t
+            SELECT creator_id, array_agg(tag) as tags,
+                   (SELECT tag FROM artist_tags_summary ats2 
+                    WHERE ats2.creator_id = ats1.creator_id 
+                    ORDER BY usage_count DESC LIMIT 1) as top_tag
+            FROM artist_tags_summary ats1
+            WHERE creator_id = ANY($1)
             GROUP BY creator_id
         """, [r['id'] for r in nodes_metadata if r['is_artist']])
         for r in tag_rows:
-            artist_tags_map[r['creator_id']] = r['tags'][:3] # Top 3 tags
+            artist_tags_map[r['creator_id']] = r['tags'][:3]
+            primary_tag_map[r['creator_id']] = r['top_tag']
     
     # 5. Resolve global scores (from app db)
     async with get_app_conn() as app_conn:
@@ -264,6 +265,7 @@ async def get_graph(address: str):
             "score": s,
             "rank": r,
             "role": role,
+            "community": primary_tag_map.get(n['id'], role), # Use tag or fallback to role
             "tags": artist_tags_map.get(n['id'], []),
             "subjective_score": sub_s,
             "status": get_status(n['id'], s, sub_s),

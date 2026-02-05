@@ -7,13 +7,18 @@
     <style>
         body { background: #0f172a; color: #f8fafc; font-family: monospace; margin: 0; overflow: hidden; }
         #controls { height: 60px; padding: 10px 20px; background: #1e293b; border-bottom: 1px solid #334155; display: flex; gap: 10px; align-items: center; }
-        #legend { position: absolute; bottom: 20px; left: 20px; background: rgba(30, 41, 59, 0.9); padding: 15px; border-radius: 8px; border: 1px solid #334155; z-index: 5; font-size: 0.8em; line-height: 1.6em; }
+        #legend { position: absolute; bottom: 20px; left: 20px; background: rgba(15, 23, 42, 0.9); padding: 15px; border-radius: 8px; border: 1px solid #334155; z-index: 5; font-size: 0.8em; line-height: 1.6em; }
         #graph-container { width: 100vw; height: calc(100vh - 80px); background: #0f172a; position: relative; min-height: 400px; }
         input { background: #334155; border: 1px solid #475569; color: white; padding: 10px; min-width: 350px; border-radius: 4px; }
         button { background: #2563eb; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-weight: bold;}
         button:hover { background: #1d4ed8; }
         .legend-item { display: flex; align-items: center; gap: 8px; }
         .dot { width: 10px; height: 10px; border-radius: 50%; }
+        .community-photography { background: #38bdf8; }
+        .community-glitch { background: #f43f5e; }
+        .community-3d { background: #8b5cf6; }
+        .community-illustration { background: #fb923c; }
+        .community-pfp { background: #2dd4bf; }
         
         /* Modal Styles */
         #modal { display: none; position: fixed; z-index: 10; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); }
@@ -36,12 +41,15 @@
 <div id="graph-container"></div>
 
 <div id="legend">
-    <div class="legend-item"><div class="dot" style="background: #38bdf8; border: 1px solid white;"></div> <span>You (Center)</span></div>
-    <div class="legend-item"><div class="dot" style="background: #22c55e; box-shadow: 0 0 5px #22c55e;"></div> <span>Trusted (Inner Ring)</span></div>
-    <div class="legend-item"><div class="dot" style="background: #eab308"></div> <span>Known (Mid Ring)</span></div>
-    <div class="legend-item"><div class="dot" style="background: #334155"></div> <span>Unknown (Outer Shell)</span></div>
+    <div class="legend-item"><div class="dot community-photography"></div> <span>Photography</span></div>
+    <div class="legend-item"><div class="dot community-glitch"></div> <span>Glitch Art</span></div>
+    <div class="legend-item"><div class="dot community-3d"></div> <span>3D / Generative</span></div>
+    <div class="legend-item"><div class="dot community-illustration"></div> <span>Illustration</span></div>
+    <div class="legend-item"><div class="dot community-pfp"></div> <span>PFP / Collectibles</span></div>
     <div style="margin-top:8px; color: #94a3b8; font-size: 0.9em; border-top: 1px solid #334155; padding-top: 8px;">
-        Clusters by Subjective Trust<br>Sizes by Global Reputation
+        <span style="color:#22c55e">🟢 Green Outer Ring:</span> Directly Trusted<br>
+        <span style="color:#ffffff">⭕ White Center:</span> High Reputation<br>
+        <b>Hover node to focus paths</b>
     </div>
 </div>
 
@@ -55,6 +63,9 @@
 
 <script>
     let graph;
+    let hoverNode = null;
+    const neighbors = new Set();
+    const neighborLinks = new Set();
 
     function closeModal() { document.getElementById('modal').style.display = 'none'; }
     function copyText(text) {
@@ -83,23 +94,35 @@
             }
             
             // Map status & roles to colors (The Signal System)
+            const nodeIds = new Set(rawData.nodes.map(n => String(n.id)));
+            
+            // Community Palette
+            const communityColors = {
+                'photography': '#38bdf8', // light blue
+                'glitch': '#f43f5e',      // rose/red
+                '3d': '#8b5cf6',          // purple
+                'illustration': '#fb923c',// orange
+                'pfp': '#2dd4bf',         // teal
+                'og_artist': '#ec4899',   // pink
+                'artist': '#ec4899',      // pink
+                'whale': '#facc15',       // yellow
+                'og': '#818cf8',          // indigo
+                'collector': '#94a3b8'    // slate
+            };
+
             const nodes = rawData.nodes.map(n => {
-                let color = '#334155'; // default low signal (slate-700)
+                const comm = (n.community || 'collector').toLowerCase();
+                const baseColor = communityColors[comm] || communityColors['collector'];
                 
-                if (n.status === 'GREEN') color = '#22c55e';  // vibrant green
-                if (n.status === 'YELLOW') color = '#eab308'; // gold
-                if (n.status === 'CENTER') color = '#38bdf8'; // sky blue center
-                
-                // If it's a high subjective score, give it a glow or larger base
                 return {
                     ...n,
                     id: String(n.id),
-                    color: color,
+                    baseColor: baseColor,
+                    color: baseColor, // for default engine fallback
                     size: Math.sqrt(n.score || 1) * 0.8 + 3
                 }
             });
 
-            const nodeIds = new Set(nodes.map(n => n.id));
             const validLinks = rawData.edges
                 .filter(e => nodeIds.has(String(e.from)) && nodeIds.has(String(e.to)))
                 .map(e => ({
@@ -112,6 +135,7 @@
                 nodes: nodes,
                 links: validLinks
             };
+            console.log("Sample Node Data:", nodes[0]);
 
             const elem = document.getElementById('graph-container');
             if (graph) {
@@ -124,32 +148,55 @@
                 .height(elem.clientHeight)
                 .graphData(gData)
                 .nodeId('id')
-                .nodeVal(n => Math.sqrt(n.score || 1) * 0.5 + 2) 
+                .nodeVal(n => n.size) 
                 .nodeLabel(n => `
                     <b>${n.name || n.address}</b><br>
-                    ${n.tags.length > 0 ? 'Tags: ' + n.tags.join(', ') + '<br>' : ''}
-                    Role: ${n.role}<br>
+                    Community: ${n.community}<br>
                     Global Score: ${n.score?.toFixed(2)}<br>
-                    Subjective Score: ${n.subjective_score?.toFixed(2)}%
+                    Match: ${n.subjective_score?.toFixed(2)}%
                 `)
-                .nodeColor(n => n.color)
-                .linkWidth(l => Math.log1p(l.value || 1))
-                .linkColor(l => {
-                    // Highlight paths from the center
-                    if (l.source.id === rawData.nodes.find(n => n.group === 'center')?.id) return 'rgba(234, 179, 8, 0.4)';
-                    return 'rgba(148, 163, 184, 0.15)';
+                .nodeColor(n => {
+                    if (hoverNode && n.id !== hoverNode.id && !neighbors.has(n.id)) return 'rgba(31, 41, 55, 0.2)';
+                    return n.baseColor;
                 })
-                .linkDirectionalArrowLength(l => l.source.id === rawData.nodes.find(n => n.group === 'center')?.id ? 4 : 2)
+                .linkWidth(l => (neighborLinks.has(l) ? 2 : 1))
+                .linkColor(l => {
+                    if (hoverNode && !neighborLinks.has(l)) return 'rgba(0,0,0,0)';
+                    if (l.source.id === rawData.nodes.find(n => n.group === 'center')?.id) return 'rgba(56, 189, 248, 0.4)';
+                    return 'rgba(148, 163, 184, 0.1)';
+                })
+                .linkDirectionalArrowLength(l => neighborLinks.has(l) ? 4 : 0)
                 .linkDirectionalArrowRelPos(1)
+                .onNodeHover(node => {
+                    neighbors.clear();
+                    neighborLinks.clear();
+                    if (node) {
+                        hoverNode = node;
+                        // Use graphData().links to get the objects that force-graph has processed
+                        graph.graphData().links.forEach(link => {
+                            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                            
+                            if (sourceId === node.id || targetId === node.id) {
+                                neighborLinks.add(link);
+                                neighbors.add(sourceId);
+                                neighbors.add(targetId);
+                            }
+                        });
+                    } else {
+                        hoverNode = null;
+                    }
+                    elem.style.cursor = node ? 'pointer' : null;
+                })
                 .onNodeClick(node => {
                     const body = document.getElementById('modalBody');
                     body.innerHTML = `
                         <div><label>Name</label><span>${node.name || 'Anonymous'}</span><button class="btn-copy" onclick="copyText('${node.name || ''}')">Copy</button></div>
                         <div><label>Address</label><span style="font-size:0.8em">${node.address}</span><button class="btn-copy" onclick="copyText('${node.address}')">Copy</button></div>
-                        <div><label>Market Role</label><span style="text-transform: capitalize; font-weight: bold;">${node.role.replace('_', ' ')}</span></div>
-                        ${node.tags.length > 0 ? `<div><label>Artist Tags</label><span style="color: #94a3b8">${node.tags.join(', ')}</span></div>` : ''}
-                        <div><label>Global Trust</label><span>Rank #${node.rank || 'N/A'} (Score: ${(node.score || 0).toFixed(2)})</span></div>
-                        <div><label>Subjective Trust</label><span style="color: ${node.color}">${node.subjective_score.toFixed(2)}% Match</span></div>
+                        <div><label>Primary Tag / Community</label><span style="text-transform: capitalize; font-weight: bold; color: ${node.baseColor}">${node.community}</span></div>
+                        ${node.tags.length > 0 ? `<div><label>Known Tags</label><span style="color: #94a3b8">${node.tags.join(', ')}</span></div>` : ''}
+                        <div><label>Global Rank</label><span># ${node.rank || 'N/A'} (Score: ${node.score.toFixed(2)})</span></div>
+                        <div><label>Subjective Match</label><span style="color: #22c55e">${node.subjective_score.toFixed(2)}% proximity</span></div>
                     `;
                     document.getElementById('modal').style.display = 'block';
                 })
@@ -159,35 +206,51 @@
                     ctx.font = `${fontSize}px monospace`;
                     
                     const r = node.size;
+                    const isDimmed = hoverNode && node.id !== hoverNode.id && !neighbors.has(node.id);
+                    const isMain = node.score > 30 || node.status === 'CENTER' || (hoverNode && node.id === hoverNode.id);
                     
                     // Node Circle
                     ctx.beginPath();
                     ctx.arc(node.x, node.y, r, 0, 2 * Math.PI, false);
-                    ctx.fillStyle = node.color;
-                    ctx.shadowColor = node.color;
-                    ctx.shadowBlur = node.status === 'GREEN' ? 10/globalScale : 0;
+                    
+                    const baseColor = node.baseColor || '#64748b';
+                    ctx.fillStyle = isDimmed ? 'rgba(31, 41, 55, 0.2)' : baseColor;
+                    
+                    if (!isDimmed) {
+                        ctx.shadowColor = baseColor;
+                        ctx.shadowBlur = (node.status === 'GREEN' || isMain) ? 15/globalScale : 0;
+                    }
+                    
                     ctx.fill();
                     ctx.shadowBlur = 0; // reset
                     
-                    // Center/Curator Indicator
-                    if (node.status === 'CENTER' || node.role === 'whale') {
-                        ctx.strokeStyle = '#ffffff';
-                        ctx.lineWidth = 1.5/globalScale;
-                        ctx.stroke();
+                    // Trust Ring
+                    if (!isDimmed) {
+                        if (node.status === 'CENTER') {
+                            ctx.strokeStyle = '#ffffff';
+                            ctx.lineWidth = 3/globalScale;
+                            ctx.stroke();
+                        } else if (node.status === 'GREEN') {
+                            ctx.strokeStyle = 'rgba(34, 197, 94, 0.8)';
+                            ctx.lineWidth = 2/globalScale;
+                            ctx.stroke();
+                        }
                     }
 
                     // Text
-                    if (globalScale > 2.5) { 
+                    if (isMain || globalScale > 2.5) { 
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
-                        ctx.fillStyle = 'rgba(248, 250, 252, 0.8)';
+                        ctx.fillStyle = isDimmed ? 'rgba(248, 250, 252, 0.1)' : 'rgba(241, 245, 249, 0.9)';
+                        
+                        if (isMain) ctx.font = `bold ${fontSize}px monospace`;
                         ctx.fillText(label, node.x, node.y + r + fontSize);
                         
-                        // Small sub-text for tags
-                        if (node.tags && node.tags.length > 0 && globalScale > 4) {
+                        // Community Tag
+                        if (!isDimmed && node.community && node.community !== 'artist' && globalScale > 3.5) {
                             ctx.font = `${fontSize * 0.7}px monospace`;
-                            ctx.fillStyle = 'rgba(148, 163, 184, 0.6)';
-                            ctx.fillText(node.tags[0], node.x, node.y + r + fontSize * 2);
+                            ctx.fillStyle = 'rgba(148, 163, 184, 0.8)';
+                            ctx.fillText(node.community.toUpperCase(), node.x, node.y + r + fontSize * 2);
                         }
                     }
                 });
@@ -196,21 +259,54 @@
             const width = elem.clientWidth;
             const height = elem.clientHeight;
 
-            graph.d3Force('charge').strength(-150);
-            graph.d3Force('link').distance(40).strength(0.3); // Weaken links to allow radial rings
+            graph.d3Force('charge').strength(-200);
+            graph.d3Force('link').distance(50).strength(0.2); 
             
             // Remove standard center force - replace with radial
             graph.d3Force('center', null);
             
+            const RADIUS_1 = 300;
+            const RADIUS_2 = 600;
+            const RADIUS_3 = 1000;
+
             graph.d3Force('radial', d3.forceRadial(d => {
                 if (d.status === 'CENTER') return 0;
-                if (d.status === 'GREEN') return 180;
-                if (d.status === 'YELLOW') return 400;
-                return 650;
-            }, 0, 0).strength(0.8));
+                if (d.status === 'GREEN') return RADIUS_1;
+                if (d.status === 'YELLOW') return RADIUS_2;
+                return RADIUS_3;
+            }, 0, 0).strength(1.5)); 
+
+            // Add background rings to the canvas
+            graph.onRenderFramePre((ctx, scale) => {
+                ctx.save();
+                ctx.beginPath();
+                ctx.setLineDash([5, 10]);
+                ctx.strokeStyle = 'rgba(148, 163, 184, 0.1)';
+                
+                // Draw 3 rings
+                ctx.arc(0, 0, RADIUS_1, 0, 2 * Math.PI);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.arc(0, 0, RADIUS_2, 0, 2 * Math.PI);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.arc(0, 0, RADIUS_3, 0, 2 * Math.PI);
+                ctx.stroke();
+                
+                // Ring Labels
+                ctx.font = `${20/scale}px monospace`;
+                ctx.fillStyle = 'rgba(148, 163, 184, 0.3)';
+                ctx.fillText("TRUSTED", RADIUS_1 + 10, 0);
+                ctx.fillText("KNOWN", RADIUS_2 + 10, 0);
+                ctx.fillText("DISCOVERY", RADIUS_3 + 10, 0);
+                
+                ctx.restore();
+            });
 
             // Collision to prevent overlap in dense rings
-            graph.d3Force('collide', d3.forceCollide(n => n.size + 4));
+            graph.d3Force('collide', d3.forceCollide(n => n.size + 6));
 
             // Zoom to fit after a short delay to allow initial layout
             setTimeout(() => {
