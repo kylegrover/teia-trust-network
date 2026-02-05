@@ -41,6 +41,8 @@
     <label style="margin-left:8px; color:#94a3b8">Top N:</label>
     <input id="maxFirst" type="number" min="5" max="200" value="80" style="width:70px; background:#24303f; color:#e6eef8; border:1px solid #334155; padding:6px; border-radius:4px;" />
     <label style="margin-left:8px; color:#94a3b8"><input id="showSecond" type="checkbox" checked /> show 2nd-degree</label>
+    <button id="btnRadial" onclick="toggleRadial()" title="Toggle radial layout (experimental)">Radial: off</button>
+    <button id="btnRings" onclick="toggleRings()" title="Toggle guide rings">Rings: off</button>
     <button id="btnCluster" onclick="toggleClusterLayout()" title="Toggle community clustering">Cluster: off</button>
 </div>
 
@@ -87,10 +89,83 @@
         });
     }
 
-    // --- Layout control helpers ---
+    // --- Layout and Hover helpers ---
     let clusterEnabled = false;
-    let communityCenters = {}; // computed per view
-    const MAX_NEIGHBOR_LABELS = 40; // avoid extreme clutter
+    let communityCenters = {}; 
+    const MAX_NEIGHBOR_LABELS = 40; 
+    let lastHoverNodeId = null;
+
+    function handleHover(node) {
+        if (node && String(node.id) === lastHoverNodeId) return; // skip redundant
+        
+        neighbors.clear(); neighborLinks.clear(); neighborsLimited.clear(); neighborLinksLimited.clear();
+        if (node) {
+            hoverNode = node;
+            lastHoverNodeId = String(node.id);
+            const gData = graph.graphData();
+            
+            gData.links.forEach(link => {
+                const s = typeof link.source === 'object' ? String(link.source.id) : String(link.source);
+                const t = typeof link.target === 'object' ? String(link.target.id) : String(link.target);
+                if (s === node.id || t === node.id) {
+                    neighborLinks.add(link);
+                    neighbors.add(s); neighbors.add(t);
+                }
+            });
+            const neighborIds = Array.from(neighbors).slice(0, MAX_NEIGHBOR_LABELS);
+            neighborIds.forEach(id => neighborsLimited.add(id));
+            gData.links.forEach(l => {
+                const s = typeof l.source === 'object' ? String(l.source.id) : String(l.source);
+                const t = typeof l.target === 'object' ? String(l.target.id) : String(l.target);
+                if (neighborsLimited.has(s) && neighborsLimited.has(t)) neighborLinksLimited.add(l);
+            });
+        } else {
+            hoverNode = null;
+            lastHoverNodeId = null;
+        }
+
+        // Force a robust canvas refresh
+        if (graph) {
+            // Use d3AlphaTarget if available, or fallback to refresh/tick methods
+            if (typeof graph.d3AlphaTarget === 'function') {
+                graph.d3AlphaTarget(0.0001);
+                setTimeout(() => graph.d3AlphaTarget(0), 20);
+            } else if (typeof graph.refresh === 'function') {
+                graph.refresh();
+            }
+        }
+    }
+
+    let radialEnabled = false; 
+    let ringsEnabled = false;  
+
+    function toggleRadial() {
+        radialEnabled = !radialEnabled;
+        document.getElementById('btnRadial').innerText = `Radial: ${radialEnabled ? 'on' : 'off'}`;
+        // reapply forces on current graph
+        if (graph) {
+            if (radialEnabled) {
+                graph.d3Force('radial', d3.forceRadial(d => {
+                    if (d.status === 'CENTER') return 0;
+                    if (d.status === 'GREEN') return 150;
+                    if (d.status === 'YELLOW') return 500;
+                    return 800;
+                }).strength(0.8));
+            } else {
+                graph.d3Force('radial', null);
+            }
+            if (typeof graph.d3AlphaTarget === 'function') {
+                graph.d3AlphaTarget(0.1).alpha(0.3); // wake up
+                setTimeout(() => graph.d3AlphaTarget(0), 400);
+            }
+        }
+    }
+
+    function toggleRings() {
+        ringsEnabled = !ringsEnabled;
+        document.getElementById('btnRings').innerText = `Rings: ${ringsEnabled ? 'on' : 'off'}`;
+        if (typeof graph.tickFrame === 'function') graph.tickFrame();
+    }
 
     function computeCommunityCenters(nodes, elem) {
         // Assign each community an angle and position on the ring (only communities present in view)
@@ -233,18 +308,6 @@
                 .height(elem.clientHeight)
                 .graphData(gData)
                 .nodeId('id')
-                .nodeVal(n => n.size) 
-                .nodeLabel(n => `
-                    <b>${n.name || n.address}</b><br>
-                    Community: ${n.community}<br>
-                    Global Score: ${n.score?.toFixed(2)}<br>
-                    Match: ${n.subjective_score?.toFixed(2)}%
-                `)
-                .nodeColor(n => {
-                    if (hoverNode && n.id !== hoverNode.id && !neighbors.has(n.id)) return 'rgba(31, 41, 55, 0.2)';
-                    return n.baseColor;
-                })
-                .linkWidth(l => (neighborLinksLimited.has(l) ? 2.2 : (l.hop === 1 ? 1.2 : 0.6)))
                 .linkColor(l => {
                     // If hovering, hide non-neighbors
                     if (hoverNode && !neighborLinksLimited.has(l)) return 'rgba(0,0,0,0)';
@@ -253,46 +316,16 @@
                     if (l.hop === 2) return 'rgba(234,179,8,0.25)';      // discovery (gold)
                     return 'rgba(148,163,184,0.08)';                    // faint internal
                 })
+                .nodeColor(n => {
+                    if (hoverNode && n.id !== hoverNode.id && !neighbors.has(n.id)) return 'rgba(31, 41, 55, 0.2)';
+                    return n.baseColor;
+                })
+                .linkWidth(l => (neighborLinksLimited.has(l) ? 2.2 : (l.hop === 1 ? 1.2 : 0.6)))
                 .linkDirectionalArrowLength(l => neighborLinksLimited.has(l) ? 4 : 0)
                 .linkDirectionalArrowRelPos(1)
-                .onNodeHover(node => {
-                    neighbors.clear();
-                    neighborLinks.clear();
-                    neighborLinksLimited.clear();
-                    neighborsLimited.clear();
-                    if (node) {
-                        hoverNode = node;
-                        graph.graphData().links.forEach(link => {
-                            const sourceId = typeof link.source === 'object' ? String(link.source.id) : String(link.source);
-                            const targetId = typeof link.target === 'object' ? String(link.target.id) : String(link.target);
-                            
-                            if (sourceId === node.id || targetId === node.id) {
-                                neighborLinks.add(link);
-                                neighbors.add(sourceId);
-                                neighbors.add(targetId);
-                            }
-                        });
-
-                        // limit number of neighbor labels/links rendered to avoid clutter
-                        const neighborIds = Array.from(neighbors).slice(0, MAX_NEIGHBOR_LABELS);
-                        neighborIds.forEach(id => neighborsLimited.add(id));
-                        graph.graphData().links.forEach(l => {
-                            const s = typeof l.source === 'object' ? String(l.source.id) : String(l.source);
-                            const t = typeof l.target === 'object' ? String(l.target.id) : String(l.target);
-                            if (neighborsLimited.has(s) && neighborsLimited.has(t)) neighborLinksLimited.add(l);
-                        });
-                    } else {
-                        hoverNode = null;
-                    }
-                    elem.style.cursor = node ? 'pointer' : null;
-                    // Force a single render frame so hover highlights appear even after layout cooled.
-                    if (typeof graph.tickFrame === 'function') {
-                        graph.tickFrame();
-                    } else if (typeof graph.d3AlphaTarget === 'function') {
-                        graph.d3AlphaTarget(0.01);
-                        setTimeout(() => graph.d3AlphaTarget(0), 60);
-                    }
-                })
+                .nodeVal(n => n.size) 
+                .nodeLabel(null) 
+                .onNodeHover(node => handleHover(node))
                 .onNodeClick(node => {
                     const body = document.getElementById('modalBody');
                     body.innerHTML = `
@@ -360,8 +393,33 @@
                         }
                     }
 
+                    // Hover Tooltip (replacing native nodeLabel to ensure it updates during static mode)
+                    if (hoverNode && node.id === hoverNode.id) {
+                        const tip = `${node.name || node.address}\n${node.community}\nSubjective: ${node.subjective_score.toFixed(1)}%`;
+                        const lines = tip.split('\n');
+                        const tipFont = 12/globalScale;
+                        ctx.font = `bold ${tipFont}px monospace`;
+                        const padding = 8/globalScale;
+                        const lineHeight = tipFont * 1.2;
+                        const boxWidth = Math.max(...lines.map(l => ctx.measureText(l).width)) + padding * 2;
+                        const boxHeight = lines.length * lineHeight + padding * 2;
+                        
+                        ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+                        ctx.strokeStyle = node.baseColor;
+                        ctx.lineWidth = 1/globalScale;
+                        ctx.fillRect(node.x + r + 5, node.y - boxHeight/2, boxWidth, boxHeight);
+                        ctx.strokeRect(node.x + r + 5, node.y - boxHeight/2, boxWidth, boxHeight);
+                        
+                        ctx.fillStyle = '#f8fafc';
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'top';
+                        lines.forEach((line, i) => {
+                            ctx.fillText(line, node.x + r + 5 + padding, node.y - boxHeight/2 + padding + i * lineHeight);
+                        });
+                    }
+
                     // Neighbor labels (show linked node names on hover regardless of zoom)
-                    if (hoverNode && (neighborsLimited.size ? neighborsLimited.has(node.id) : neighbors.has(node.id))) {
+                    if (hoverNode && (neighborsLimited.size ? neighborsLimited.has(node.id) : neighbors.has(node.id)) && node.id !== hoverNode.id) {
                         const neighborLabel = node.name || node.address.substring(0,6);
                         const nkFont = Math.max(10, fontSize * 0.9);
                         ctx.font = `bold ${nkFont}px monospace`;
@@ -434,22 +492,36 @@
                 ctx.restore();
             });
 
-            // Collision to prevent overlap in dense rings
-            graph.d3Force('collide', d3.forceCollide(n => n.size + 6));
+            // Keep the spatial index fresh (throttled) so pointer detection remains accurate
+            graph.onRenderFramePost(() => {
+                // intentionally empty - quadtree manual hover removed to fix offset
+            });
 
-// Zoom to fit after a short delay to allow initial layout — let the sim naturally cool
-                setTimeout(() => {
-                    graph.zoomToFit(600, 100);
-                    if (typeof graph.d3AlphaTarget === 'function') graph.d3AlphaTarget(0.001);
+            // Add nodePointerAreaPaint to make hovering easier
+            graph.nodePointerAreaPaint((node, color, ctx) => {
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, node.size + 10, 0, 2 * Math.PI, false);
+                ctx.fill();
+            });
+
+            // Zoom to fit after a short delay to allow initial layout — let the sim naturally cool
+            setTimeout(() => {
+                graph.zoomToFit(600, 100);
             }, 800);
-
-        } catch (e) {
-            console.error(e);
-            alert("Error: " + e.message);
+        } catch (err) {
+            console.error('drawGraph error', err);
+            try { alert(err.message || String(err)); } catch (__) { /* ignore in non-browser tests */ }
         }
-    }
+    } // drawGraph
 
     // expose for debugging
+    window.drawGraph = drawGraph;
+    window.copyText = copyText;
+    window.closeModal = closeModal;
+    window.toggleRadial = toggleRadial;
+    window.toggleRings = toggleRings;
+    window.toggleClusterLayout = toggleClusterLayout;
     console.info('viz-force: drawGraph loaded');
 </script>
 </body>
