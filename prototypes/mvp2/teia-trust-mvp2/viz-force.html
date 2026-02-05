@@ -36,14 +36,12 @@
 <div id="graph-container"></div>
 
 <div id="legend">
-    <div class="legend-item"><div class="dot" style="background: #eab308"></div> <span>Center Wallet</span></div>
-    <div class="legend-item"><div class="dot" style="background: #f43f5e"></div> <span>OG Artist (Early & Creator)</span></div>
-    <div class="legend-item"><div class="dot" style="background: #ec4899"></div> <span>Artist</span></div>
-    <div class="legend-item"><div class="dot" style="background: #3b82f6"></div> <span>Whale (>500 buys)</span></div>
-    <div class="legend-item"><div class="dot" style="background: #8b5cf6"></div> <span>OG Collector (2021)</span></div>
-    <div class="legend-item"><div class="dot" style="background: #64748b"></div> <span>Collector</span></div>
+    <div class="legend-item"><div class="dot" style="background: #ffffff"></div> <span>You (Center)</span></div>
+    <div class="legend-item"><div class="dot" style="background: #22c55e"></div> <span>Trusted (Direct/Personalized)</span></div>
+    <div class="legend-item"><div class="dot" style="background: #eab308"></div> <span>Known (Global Rank)</span></div>
+    <div class="legend-item"><div class="dot" style="background: #475569"></div> <span>Unknown / Low Signal</span></div>
     <div style="margin-top:8px; color: #94a3b8; font-size: 0.9em; border-top: 1px solid #334155; padding-top: 8px;">
-        Scroll to Zoom<br>Click nodes for profile
+        Sizes based on Global PageRank<br>Labels show Artist Tags
     </div>
 </div>
 
@@ -84,15 +82,15 @@
                 throw new Error("No graph data found for this address.");
             }
             
-            // Map schema & roles to colors
+            // Map status & roles to colors (The Signal System)
             const nodes = rawData.nodes.map(n => {
-                let color = '#64748b'; // default collector (slate)
-                if (n.role === 'artist') color = '#ec4899'; // pink
-                if (n.role === 'whale') color = '#3b82f6';  // blue
-                if (n.role === 'og') color = '#8b5cf6';    // purple
-                if (n.role === 'og_artist') color = '#f43f5e'; // rose/red
-                if (n.group === 'center') color = '#eab308'; // gold
-
+                let color = '#475569'; // default low signal (grayish)
+                
+                if (n.status === 'GREEN') color = '#22c55e';  // vibrant green
+                if (n.status === 'YELLOW') color = '#eab308'; // gold
+                if (n.status === 'CENTER') color = '#ffffff'; // white center
+                
+                // Role-based stroke or pulse? Let's keep color for status, but role in stroke
                 return {
                     ...n,
                     id: String(n.id),
@@ -126,7 +124,13 @@
                 .graphData(gData)
                 .nodeId('id')
                 .nodeVal(n => Math.sqrt(n.score || 1) * 0.5 + 2) 
-                .nodeLabel(n => `${n.name || n.address}<br>Role: ${n.role}<br>Rank: #${n.rank || '??'}<br>Score: ${n.score?.toFixed(2)}`)
+                .nodeLabel(n => `
+                    <b>${n.name || n.address}</b><br>
+                    ${n.tags.length > 0 ? 'Tags: ' + n.tags.join(', ') + '<br>' : ''}
+                    Role: ${n.role}<br>
+                    Global Score: ${n.score?.toFixed(2)}<br>
+                    Subjective Score: ${n.subjective_score?.toFixed(2)}%
+                `)
                 .nodeColor(n => n.color)
                 .linkWidth(l => Math.log1p(l.value || 1))
                 .linkColor(l => {
@@ -141,9 +145,10 @@
                     body.innerHTML = `
                         <div><label>Name</label><span>${node.name || 'Anonymous'}</span><button class="btn-copy" onclick="copyText('${node.name || ''}')">Copy</button></div>
                         <div><label>Address</label><span style="font-size:0.8em">${node.address}</span><button class="btn-copy" onclick="copyText('${node.address}')">Copy</button></div>
-                        <div><label>Market Role</label><span style="text-transform: capitalize; font-weight: bold; color: ${node.color}">${node.role.replace('_', ' ')}</span></div>
-                        <div><label>Trust Score</label><span>${(node.score || 0).toFixed(2)}</span></div>
-                        <div><label>Network Rank</label><span># ${node.rank || 'N/A'}</span></div>
+                        <div><label>Market Role</label><span style="text-transform: capitalize; font-weight: bold;">${node.role.replace('_', ' ')}</span></div>
+                        ${node.tags.length > 0 ? `<div><label>Artist Tags</label><span style="color: #94a3b8">${node.tags.join(', ')}</span></div>` : ''}
+                        <div><label>Global Trust</label><span>Rank #${node.rank || 'N/A'} (Score: ${(node.score || 0).toFixed(2)})</span></div>
+                        <div><label>Subjective Trust</label><span style="color: ${node.color}">${node.subjective_score.toFixed(2)}% Match</span></div>
                     `;
                     document.getElementById('modal').style.display = 'block';
                 })
@@ -171,11 +176,18 @@
                     }
 
                     // Text
-                    if (globalScale > 2.5) { // Show labels when zoomed in (higher threshold for cleaner view)
+                    if (globalScale > 2.5) { 
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillStyle = 'rgba(248, 250, 252, 0.8)';
                         ctx.fillText(label, node.x, node.y + r + fontSize);
+                        
+                        // Small sub-text for tags
+                        if (node.tags && node.tags.length > 0 && globalScale > 4) {
+                            ctx.font = `${fontSize * 0.7}px monospace`;
+                            ctx.fillStyle = 'rgba(148, 163, 184, 0.6)';
+                            ctx.fillText(node.tags[0], node.x, node.y + r + fontSize * 2);
+                        }
                     }
                 });
 

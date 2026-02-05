@@ -15,32 +15,60 @@ async def init_score_table():
             CREATE INDEX IF NOT EXISTS idx_trust_scores_rank ON trust_scores(rank);
         """)
 
+class TrustEngine:
+    def __init__(self):
+        self.G = nx.DiGraph()
+        self.global_scores = {}
+        self.nodes_loaded = False
+
+    async def load_graph(self):
+        print("📥 Fetching trust connections from indexer db...")
+        async with get_index_conn() as conn:
+            rows = await conn.fetch("SELECT source_id, target_id, trade_count FROM trust_connections")
+        
+        if not rows:
+            print("⚠️ No trust connections found.")
+            return
+
+        print(f"🏗️ Building graph from {len(rows)} connections...")
+        self.G = nx.DiGraph()
+        for r in rows:
+            # We use log of trade count to dampen whale impact but keep signal
+            weight = 1.0 + (r['trade_count'] or 1)
+            self.G.add_edge(r['source_id'], r['target_id'], weight=weight)
+            
+        print(f"📊 Graph stats: {self.G.number_of_nodes()} nodes, {self.G.number_of_edges()} edges")
+        self.nodes_loaded = True
+
+    def compute_global_pagerank(self):
+        print("🧠 Computing Global PageRank...")
+        self.global_scores = nx.pagerank(self.G, alpha=0.85, weight='weight')
+        return self.global_scores
+
+    def compute_personalized_pagerank(self, seed_node_id: int):
+        if not self.nodes_loaded or seed_node_id not in self.G:
+            return {}
+        
+        print(f"🧠 Computing Personalized PageRank for seed {seed_node_id}...")
+        # PPR starts the random walk from the seed node 100% of the time
+        try:
+            return nx.pagerank(self.G, alpha=0.85, weight='weight', personalization={seed_node_id: 1.0})
+        except:
+            return {}
+
 async def run_trust_algorithm():
     print("🚀 Starting Trust Engine MVP2 (Isolated DB Mode)...")
     start_time = time.time()
     
     await init_score_table()
     
-    # 1. Fetch edges from the READ-ONLY Indexer DB
-    print("📥 Fetching trust connections from indexer db...")
-    async with get_index_conn() as conn:
-        rows = await conn.fetch("SELECT source_id, target_id, trade_count FROM trust_connections")
+    engine = TrustEngine()
+    await engine.load_graph()
     
-    if not rows:
-        print("⚠️ No trust connections found. Is the indexer finished?")
+    if not engine.nodes_loaded:
         return
 
-    # 2. Build the graph
-    print(f"🏗️ Building graph from {len(rows)} connections...")
-    G = nx.DiGraph()
-    for r in rows:
-        G.add_edge(r['source_id'], r['target_id'], weight=r['trade_count'])
-        
-    print(f"📊 Graph stats: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
-
-    # 3. Compute PageRank
-    print("🧠 Computing PageRank (weighted)...")
-    scores = nx.pagerank(G, alpha=0.85, weight='weight')
+    scores = engine.compute_global_pagerank()
     
     # 4. Normalize and Rank
     max_score = max(scores.values()) if scores else 1.0
