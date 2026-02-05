@@ -41,8 +41,6 @@
     <label style="margin-left:8px; color:#94a3b8">Top N:</label>
     <input id="maxFirst" type="number" min="5" max="200" value="80" style="width:70px; background:#24303f; color:#e6eef8; border:1px solid #334155; padding:6px; border-radius:4px;" />
     <label style="margin-left:8px; color:#94a3b8"><input id="showSecond" type="checkbox" checked /> show 2nd-degree</label>
-    <button id="btnToggleLock" onclick="toggleLockLayout()" title="Lock positions to stop motion but keep hover/zoom">Settle layout</button>
-    <button id="btnTick" onclick="tickOnce()" title="Force a single render tick">Tick</button>
     <button id="btnCluster" onclick="toggleClusterLayout()" title="Toggle community clustering">Cluster: off</button>
 </div>
 
@@ -124,10 +122,10 @@
             document.getElementById('btnCluster').innerText = 'Cluster: off';
         }
         clusterEnabled = enable;
-        // nudge sim for a short burst to let clusters form visually
+        // nudge sim for a short burst to let clusters form visually (non-destructive)
         if (typeof graph.d3AlphaTarget === 'function') {
             graph.d3AlphaTarget(0.12);
-            setTimeout(() => graph.d3AlphaTarget(0), 600);
+            setTimeout(() => graph.d3AlphaTarget(0.001), 600);
         }
     }
 
@@ -136,43 +134,6 @@
         const elem = document.getElementById('graph-container');
         if (!clusterEnabled) computeCommunityCenters(graph.graphData().nodes, elem);
         applyCommunityForces(!clusterEnabled, elem);
-    }
-
-    function lockLayout() {
-        if (!graph || !graph.graphData) return;
-        // Freeze visible node positions so the layout no longer drifts or rotates
-        graph.graphData().nodes.forEach(n => { n.fx = n.x; n.fy = n.y; });
-        // Disable user dragging to avoid torque-induced rotation
-        if (typeof graph.enableNodeDrag === 'function') graph.enableNodeDrag(false);
-        // Ensure simulation alpha is low but allow one-off frames for hover
-        if (typeof graph.d3AlphaTarget === 'function') graph.d3AlphaTarget(0);
-        simulationSettled = true;
-        document.getElementById('btnToggleLock').innerText = 'Unlock layout';
-    }
-
-    function unlockLayout() {
-        if (!graph || !graph.graphData) return;
-        graph.graphData().nodes.forEach(n => { delete n.fx; delete n.fy; });
-        if (typeof graph.enableNodeDrag === 'function') graph.enableNodeDrag(true);
-        // nudge the sim so nodes can relax again
-        if (typeof graph.d3AlphaTarget === 'function') graph.d3AlphaTarget(0.2);
-        simulationSettled = false;
-        document.getElementById('btnToggleLock').innerText = 'Settle layout';
-    }
-
-    function toggleLockLayout() {
-        if (!graph) return;
-        if (simulationSettled) unlockLayout(); else lockLayout();
-    }
-
-    function tickOnce() {
-        if (!graph) return;
-        if (typeof graph.tickFrame === 'function') return graph.tickFrame();
-        // fallback: tiny alpha nudge
-        if (typeof graph.d3AlphaTarget === 'function') {
-            graph.d3AlphaTarget(0.01);
-            setTimeout(() => graph.d3AlphaTarget(0), 40);
-        }
     }
 
     async function drawGraph() { 
@@ -262,9 +223,8 @@
 
             const elem = document.getElementById('graph-container');
             if (graph) {
-                // gently cool the previous simulation but keep interaction handlers active
-                if (typeof graph.d3AlphaTarget === 'function') graph.d3AlphaTarget(0);
-                simulationSettled = true;
+                // nudge previous simulation toward natural settle (do not pause)
+                if (typeof graph.d3AlphaTarget === 'function') graph.d3AlphaTarget(0.001);
                 elem.innerHTML = '';
             }
 
@@ -477,11 +437,10 @@
             // Collision to prevent overlap in dense rings
             graph.d3Force('collide', d3.forceCollide(n => n.size + 6));
 
-            // Zoom to fit after a short delay to allow initial layout — then pause for a static view
-            setTimeout(() => {
-                graph.zoomToFit(600, 100);
-                // Lock positions after the camera settles so we stop motion but keep pointer events
-                lockLayout();
+// Zoom to fit after a short delay to allow initial layout — let the sim naturally cool
+                setTimeout(() => {
+                    graph.zoomToFit(600, 100);
+                    if (typeof graph.d3AlphaTarget === 'function') graph.d3AlphaTarget(0.001);
             }, 800);
 
         } catch (e) {
