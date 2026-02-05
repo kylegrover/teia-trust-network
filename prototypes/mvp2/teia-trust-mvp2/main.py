@@ -164,7 +164,7 @@ async def get_trust(observer_address: str, target_address: str):
     }
 
 @app.get("/graph/{address}")
-async def get_graph(address: str):
+async def get_graph(address: str, tag: Optional[str] = None, max_first: int = 60, max_second: int = 80):
     center = await get_profile(address)
     
     # Compute Subjective Scores (Personalized PageRank)
@@ -173,18 +173,28 @@ async def get_graph(address: str):
     max_ppr = max(ppr.values()) if ppr else 0.00001
     
     async with get_index_conn() as idx_conn:
-        # 1. First Degree - People center directly supports
-        first_degree_rows = await idx_conn.fetch("""
-            SELECT target_id, trade_count 
-            FROM trust_connections 
-            WHERE source_id = $1 
-            ORDER BY trade_count DESC 
-            LIMIT 80
-        """, center.id)
-        
+        # 1. First Degree - People center directly supports (configurable limits + optional tag filter)
+        if tag:
+            first_degree_rows = await idx_conn.fetch("""
+                SELECT tc.target_id, tc.trade_count
+                FROM trust_connections tc
+                JOIN artist_tags_summary ats ON tc.target_id = ats.creator_id
+                WHERE tc.source_id = $1 AND ats.tag = $2
+                ORDER BY tc.trade_count DESC
+                LIMIT $3
+            """, center.id, tag, max_first)
+        else:
+            first_degree_rows = await idx_conn.fetch("""
+                SELECT target_id, trade_count 
+                FROM trust_connections 
+                WHERE source_id = $1 
+                ORDER BY trade_count DESC 
+                LIMIT $2
+            """, center.id, max_first)
+
         first_degree_ids = [r['target_id'] for r in first_degree_rows]
-        
-        # 2. Second Degree - Social Discovery
+
+        # 2. Second Degree - Social Discovery (configurable limit)
         second_degree_rows = await idx_conn.fetch("""
             SELECT target_id, source_id, trade_count 
             FROM (
@@ -195,9 +205,9 @@ async def get_graph(address: str):
                   AND target_id != $2
                   AND target_id != ANY($1)
             ) as sub
-            WHERE rank <= 3 -- Slightly higher discovery limit for PPR
-            LIMIT 150
-        """, first_degree_ids, center.id)
+            WHERE rank <= 3
+            LIMIT $3
+        """, first_degree_ids, center.id, max_second)
         
         all_target_ids = list(set(first_degree_ids + [r['target_id'] for r in second_degree_rows] + [center.id]))
         
@@ -272,7 +282,7 @@ async def get_graph(address: str):
             "group": "center" if n['id'] == center.id else ("1st" if n['id'] in first_degree_ids else "2nd")
         })
 
-    # 7. Build Simplified Edges
+    # 7. Build Simplified Edges (annotate hop distance and compute subgraph communities)
     async with get_index_conn() as idx_conn:
         discovery_ids = [r['target_id'] for r in second_degree_rows]
         all_edges = await idx_conn.fetch("""
@@ -287,13 +297,52 @@ async def get_graph(address: str):
               AND trade_count > 0
         """, all_target_ids, center.id, first_degree_ids, discovery_ids)
 
+    # Lightweight community detection on the returned subgraph (client can use this to cluster)
+    try:
+        import networkx as nx
+        G = nx.Graph()
+        for e in all_edges:
+            G.add_edge(e['source_id'], e['target_id'])
+        communities = []
+        try:
+            communities = list(nx.algorithms.community.label_propagation_communities(G))
+        except Exception:
+            # fallback: connected components
+            communities = [c for c in nx.connected_components(G)]
+        community_map = {}
+        for i, comm in enumerate(communities):
+            for node_id in comm:
+                community_map[node_id] = f"c{i}"
+    except Exception:
+        community_map = {}
+
+    # Build output edges with `hop` annotation
+    first_set = set(first_degree_ids)
+    discovery_set = set(discovery_ids)
+    edges_out = []
+    for e in all_edges:
+        s = e['source_id']; t = e['target_id']
+        if s == center.id or t == center.id:
+            hop = 1
+        elif s in first_set and t in first_set:
+            hop = 1
+        elif s in first_set and t in discovery_set:
+            hop = 2
+        else:
+            hop = 0
+        edges_out.append({
+            'from': s,
+            'to': t,
+            'value': e['trade_count'],
+            'hop': hop
+        })
+
+    # annotate nodes with community ids when available
+    for n in nodes:
+        if n['id'] in community_map:
+            n['community'] = community_map[n['id']]
+
     return {
-        "nodes": nodes,
-        "edges": [
-            {
-                "from": e['source_id'], 
-                "to": e['target_id'], 
-                "value": e['trade_count']
-            } for e in all_edges
-        ]
+        'nodes': nodes,
+        'edges': edges_out
     }

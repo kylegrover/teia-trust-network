@@ -36,6 +36,11 @@
     <label>Center:</label>
     <input type="text" id="centerNode" placeholder="tz... or id" value="">
     <button onclick="drawGraph()">Visualize Trust</button>
+    <label style="margin-left:12px; color:#94a3b8">Tag:</label>
+    <input id="filterTag" placeholder="e.g. photography" style="width:150px; background:#24303f; color:#e6eef8; border:1px solid #334155; padding:6px; border-radius:4px;" />
+    <label style="margin-left:8px; color:#94a3b8">Top N:</label>
+    <input id="maxFirst" type="number" min="5" max="200" value="80" style="width:70px; background:#24303f; color:#e6eef8; border:1px solid #334155; padding:6px; border-radius:4px;" />
+    <label style="margin-left:8px; color:#94a3b8"><input id="showSecond" type="checkbox" checked /> show 2nd-degree</label>
     <button id="btnToggleLock" onclick="toggleLockLayout()" title="Lock positions to stop motion but keep hover/zoom">Settle layout</button>
     <button id="btnTick" onclick="tickOnce()" title="Force a single render tick">Tick</button>
     <button id="btnCluster" onclick="toggleClusterLayout()" title="Toggle community clustering">Cluster: off</button>
@@ -52,7 +57,8 @@
     <div style="margin-top:8px; color: #94a3b8; font-size: 0.9em; border-top: 1px solid #334155; padding-top: 8px;">
         <span style="color:#22c55e">🟢 Green Outer Ring:</span> Directly Trusted<br>
         <span style="color:#ffffff">⭕ White Center:</span> High Reputation<br>
-        <b>Hover node to focus paths</b>
+        <span style="color:rgba(56,189,248,0.6)">──</span> Direct edges &nbsp; <span style="color:rgba(234,179,8,0.6)">──</span> 2nd-degree discovery<br>
+        <b>Hover node to focus paths — use Tag / Top N to filter</b>
     </div>
 </div>
 
@@ -69,6 +75,8 @@
     let hoverNode = null;
     const neighbors = new Set();
     const neighborLinks = new Set();
+    const neighborsLimited = new Set();
+    const neighborLinksLimited = new Set();
     let simulationSettled = false; // true when layout has cooled but interactions remain active
 
     function closeModal() { document.getElementById('modal').style.display = 'none'; }
@@ -172,7 +180,14 @@
         if(!centerInput) return alert("Please enter an address or ID");
 
         try {
-            const res = await fetch(`http://127.0.0.1:8000/graph/${centerInput}`);
+            // Build query params from controls
+            const tag = document.getElementById('filterTag').value.trim();
+            const maxFirst = Number(document.getElementById('maxFirst').value) || 80;
+            const params = new URLSearchParams();
+            if (tag) params.set('tag', tag);
+            params.set('max_first', String(maxFirst));
+
+            const res = await fetch(`http://127.0.0.1:8000/graph/${centerInput}?${params.toString()}`);
             const rawData = await res.json();
             
             if (!res.ok) {
@@ -200,9 +215,20 @@
                 'collector': '#94a3b8'    // slate
             };
 
+            // fallback palette (for auto-detected communities like c0,c1...)
+            const fallbackPalette = ['#60a5fa','#f472b6','#a78bfa','#fbbf24','#34d399','#f97316','#60a5fa'];
+            function getCommunityColor(c) {
+                if (!c) return communityColors['collector'];
+                const key = String(c).toLowerCase();
+                if (communityColors[key]) return communityColors[key];
+                // hash to pick fallback
+                let h = 0; for (let i=0;i<key.length;i++) h = (h<<5) - h + key.charCodeAt(i);
+                return fallbackPalette[Math.abs(h) % fallbackPalette.length];
+            }
+
             const nodes = rawData.nodes.map(n => {
                 const comm = (n.community || 'collector').toLowerCase();
-                const baseColor = communityColors[comm] || communityColors['collector'];
+                const baseColor = getCommunityColor(comm);
                 
                 return {
                     ...n,
@@ -213,19 +239,26 @@
                 }
             });
 
+            const showSecond = document.getElementById('showSecond').checked;
             const validLinks = rawData.edges
                 .filter(e => nodeIds.has(String(e.from)) && nodeIds.has(String(e.to)))
+                .filter(e => showSecond ? true : (e.hop !== 2))
                 .map(e => ({
                     source: String(e.from),
                     target: String(e.to),
-                    value: e.value
+                    value: e.value,
+                    hop: e.hop
                 }));
 
+            // Remove nodes that became isolated by client-side filters (keeps the center always)
+            const linkedNodeIds = new Set(validLinks.flatMap(l => [l.source, l.target]));
+            const filteredNodes = nodes.filter(n => linkedNodeIds.has(n.id) || n.group === 'center');
+
             const gData = {
-                nodes: nodes,
+                nodes: filteredNodes,
                 links: validLinks
             };
-            console.log("Sample Node Data:", nodes[0]);
+            console.log("Sample Node Data:", filteredNodes[0]);
 
             const elem = document.getElementById('graph-container');
             if (graph) {
@@ -251,28 +284,42 @@
                     if (hoverNode && n.id !== hoverNode.id && !neighbors.has(n.id)) return 'rgba(31, 41, 55, 0.2)';
                     return n.baseColor;
                 })
-                .linkWidth(l => (neighborLinks.has(l) ? 2 : 1))
+                .linkWidth(l => (neighborLinksLimited.has(l) ? 2.2 : (l.hop === 1 ? 1.2 : 0.6)))
                 .linkColor(l => {
-                    if (hoverNode && !neighborLinks.has(l)) return 'rgba(0,0,0,0)';
-                    if (l.source.id === rawData.nodes.find(n => n.group === 'center')?.id) return 'rgba(56, 189, 248, 0.4)';
-                    return 'rgba(148, 163, 184, 0.1)';
+                    // If hovering, hide non-neighbors
+                    if (hoverNode && !neighborLinksLimited.has(l)) return 'rgba(0,0,0,0)';
+                    // Color by hop distance
+                    if (l.hop === 1) return 'rgba(56,189,248,0.45)';      // direct (blue)
+                    if (l.hop === 2) return 'rgba(234,179,8,0.25)';      // discovery (gold)
+                    return 'rgba(148,163,184,0.08)';                    // faint internal
                 })
-                .linkDirectionalArrowLength(l => neighborLinks.has(l) ? 4 : 0)
+                .linkDirectionalArrowLength(l => neighborLinksLimited.has(l) ? 4 : 0)
                 .linkDirectionalArrowRelPos(1)
                 .onNodeHover(node => {
                     neighbors.clear();
                     neighborLinks.clear();
+                    neighborLinksLimited.clear();
+                    neighborsLimited.clear();
                     if (node) {
                         hoverNode = node;
                         graph.graphData().links.forEach(link => {
-                            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-                            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                            const sourceId = typeof link.source === 'object' ? String(link.source.id) : String(link.source);
+                            const targetId = typeof link.target === 'object' ? String(link.target.id) : String(link.target);
                             
                             if (sourceId === node.id || targetId === node.id) {
                                 neighborLinks.add(link);
                                 neighbors.add(sourceId);
                                 neighbors.add(targetId);
                             }
+                        });
+
+                        // limit number of neighbor labels/links rendered to avoid clutter
+                        const neighborIds = Array.from(neighbors).slice(0, MAX_NEIGHBOR_LABELS);
+                        neighborIds.forEach(id => neighborsLimited.add(id));
+                        graph.graphData().links.forEach(l => {
+                            const s = typeof l.source === 'object' ? String(l.source.id) : String(l.source);
+                            const t = typeof l.target === 'object' ? String(l.target.id) : String(l.target);
+                            if (neighborsLimited.has(s) && neighborsLimited.has(t)) neighborLinksLimited.add(l);
                         });
                     } else {
                         hoverNode = null;
@@ -282,7 +329,6 @@
                     if (typeof graph.tickFrame === 'function') {
                         graph.tickFrame();
                     } else if (typeof graph.d3AlphaTarget === 'function') {
-                        // nudge the simulation so it produces one frame without fully resuming
                         graph.d3AlphaTarget(0.01);
                         setTimeout(() => graph.d3AlphaTarget(0), 60);
                     }
@@ -295,6 +341,7 @@
                         <div><label>Primary Tag / Community</label><span style="text-transform: capitalize; font-weight: bold; color: ${node.baseColor}">${node.community}</span></div>
                         ${node.tags.length > 0 ? `<div><label>Known Tags</label><span style="color: #94a3b8">${node.tags.join(', ')}</span></div>` : ''}
                         <div><label>Global Rank</label><span># ${node.rank || 'N/A'} (Score: ${node.score.toFixed(2)})</span></div>
+                        <div><label>Distance</label><span style="text-transform:capitalize">${node.group === 'center' ? 'Center' : node.group}</span></div>
                         <div><label>Subjective Match</label><span style="color: #22c55e">${node.subjective_score.toFixed(2)}% proximity</span></div>
                     `;
                     document.getElementById('modal').style.display = 'block';
@@ -305,9 +352,9 @@
                     ctx.font = `${fontSize}px monospace`;
                     
                     const r = node.size;
-                    const isDimmed = hoverNode && node.id !== hoverNode.id && !neighbors.has(node.id);
+                    const isDimmed = hoverNode && node.id !== hoverNode.id && !(neighborsLimited.size ? neighborsLimited.has(node.id) : neighbors.has(node.id));
                     const isMain = node.score > 30 || node.status === 'CENTER' || (hoverNode && node.id === hoverNode.id);
-                    
+
                     // Node Circle
                     ctx.beginPath();
                     ctx.arc(node.x, node.y, r, 0, 2 * Math.PI, false);
@@ -354,7 +401,7 @@
                     }
 
                     // Neighbor labels (show linked node names on hover regardless of zoom)
-                    if (hoverNode && neighbors.has(node.id)) {
+                    if (hoverNode && (neighborsLimited.size ? neighborsLimited.has(node.id) : neighbors.has(node.id))) {
                         const neighborLabel = node.name || node.address.substring(0,6);
                         const nkFont = Math.max(10, fontSize * 0.9);
                         ctx.font = `bold ${nkFont}px monospace`;
