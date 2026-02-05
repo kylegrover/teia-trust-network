@@ -38,6 +38,7 @@
     <button onclick="drawGraph()">Visualize Trust</button>
     <button id="btnToggleLock" onclick="toggleLockLayout()" title="Lock positions to stop motion but keep hover/zoom">Settle layout</button>
     <button id="btnTick" onclick="tickOnce()" title="Force a single render tick">Tick</button>
+    <button id="btnCluster" onclick="toggleClusterLayout()" title="Toggle community clustering">Cluster: off</button>
 </div>
 
 <div id="graph-container"></div>
@@ -81,6 +82,54 @@
     }
 
     // --- Layout control helpers ---
+    let clusterEnabled = false;
+    let communityCenters = {}; // computed per view
+    const MAX_NEIGHBOR_LABELS = 40; // avoid extreme clutter
+
+    function computeCommunityCenters(nodes, elem) {
+        // Assign each community an angle and position on the ring (only communities present in view)
+        const communities = Array.from(new Set(nodes.map(n => (n.community || 'collector').toLowerCase()))).sort();
+        const cx = elem.clientWidth / 2;
+        const cy = elem.clientHeight / 2;
+        const baseRadius = Math.min(elem.clientWidth, elem.clientHeight) * 0.18;
+        communityCenters = {};
+        communities.forEach((c, i) => {
+            const angle = (i / communities.length) * Math.PI * 2 - Math.PI / 2; // start at top
+            communityCenters[c] = {
+                x: Math.cos(angle) * (baseRadius + (i % 3) * 20) + cx,
+                y: Math.sin(angle) * (baseRadius + (i % 3) * 20) + cy,
+                angle
+            };
+        });
+    }
+
+    function applyCommunityForces(enable, elem) {
+        if (!graph) return;
+        if (enable) {
+            // weak attraction to community centers so same-community nodes form visible sub-clusters
+            graph.d3Force('communityX', d3.forceX(d => (communityCenters[(d.community||'collector').toLowerCase()] || communityCenters['collector']).x).strength(0.02));
+            graph.d3Force('communityY', d3.forceY(d => (communityCenters[(d.community||'collector').toLowerCase()] || communityCenters['collector']).y).strength(0.02));
+            document.getElementById('btnCluster').innerText = 'Cluster: on';
+        } else {
+            graph.d3Force('communityX', null);
+            graph.d3Force('communityY', null);
+            document.getElementById('btnCluster').innerText = 'Cluster: off';
+        }
+        clusterEnabled = enable;
+        // nudge sim for a short burst to let clusters form visually
+        if (typeof graph.d3AlphaTarget === 'function') {
+            graph.d3AlphaTarget(0.12);
+            setTimeout(() => graph.d3AlphaTarget(0), 600);
+        }
+    }
+
+    function toggleClusterLayout() {
+        if (!graph) return;
+        const elem = document.getElementById('graph-container');
+        if (!clusterEnabled) computeCommunityCenters(graph.graphData().nodes, elem);
+        applyCommunityForces(!clusterEnabled, elem);
+    }
+
     function lockLayout() {
         if (!graph || !graph.graphData) return;
         // Freeze visible node positions so the layout no longer drifts or rotates
@@ -303,6 +352,28 @@
                             ctx.fillText(node.community.toUpperCase(), node.x, node.y + r + fontSize * 2);
                         }
                     }
+
+                    // Neighbor labels (show linked node names on hover regardless of zoom)
+                    if (hoverNode && neighbors.has(node.id)) {
+                        const neighborLabel = node.name || node.address.substring(0,6);
+                        const nkFont = Math.max(10, fontSize * 0.9);
+                        ctx.font = `bold ${nkFont}px monospace`;
+                        const padding = 6/globalScale;
+                        const textWidth = Math.min(220, ctx.measureText(neighborLabel).width + padding * 2);
+                        const tx = node.x + r + 8;
+                        const ty = node.y - r - nkFont;
+
+                        // background
+                        ctx.globalAlpha = 0.9;
+                        ctx.fillStyle = 'rgba(6,10,20,0.85)';
+                        ctx.fillRect(tx - padding, ty - nkFont, textWidth, nkFont + padding);
+                        ctx.globalAlpha = 1;
+
+                        // text
+                        ctx.fillStyle = 'rgba(241,245,249,0.95)';
+                        ctx.textAlign = 'left';
+                        ctx.fillText(neighborLabel, tx, ty + nkFont * 0.15);
+                    }
                 });
 
             // Physics Tuning - Radial Reputation Layout
@@ -364,11 +435,16 @@
                 graph.zoomToFit(600, 100);
                 // Lock positions after the camera settles so we stop motion but keep pointer events
                 lockLayout();
+            }, 800);
+
         } catch (e) {
             console.error(e);
             alert("Error: " + e.message);
         }
     }
+
+    // expose for debugging
+    console.info('viz-force: drawGraph loaded');
 </script>
 </body>
 </html>
