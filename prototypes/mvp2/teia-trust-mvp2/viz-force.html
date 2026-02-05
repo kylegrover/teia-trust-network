@@ -36,12 +36,12 @@
 <div id="graph-container"></div>
 
 <div id="legend">
-    <div class="legend-item"><div class="dot" style="background: #ffffff"></div> <span>You (Center)</span></div>
-    <div class="legend-item"><div class="dot" style="background: #22c55e"></div> <span>Trusted (Direct/Personalized)</span></div>
-    <div class="legend-item"><div class="dot" style="background: #eab308"></div> <span>Known (Global Rank)</span></div>
-    <div class="legend-item"><div class="dot" style="background: #475569"></div> <span>Unknown / Low Signal</span></div>
+    <div class="legend-item"><div class="dot" style="background: #38bdf8; border: 1px solid white;"></div> <span>You (Center)</span></div>
+    <div class="legend-item"><div class="dot" style="background: #22c55e; box-shadow: 0 0 5px #22c55e;"></div> <span>Trusted (Inner Ring)</span></div>
+    <div class="legend-item"><div class="dot" style="background: #eab308"></div> <span>Known (Mid Ring)</span></div>
+    <div class="legend-item"><div class="dot" style="background: #334155"></div> <span>Unknown (Outer Shell)</span></div>
     <div style="margin-top:8px; color: #94a3b8; font-size: 0.9em; border-top: 1px solid #334155; padding-top: 8px;">
-        Sizes based on Global PageRank<br>Labels show Artist Tags
+        Clusters by Subjective Trust<br>Sizes by Global Reputation
     </div>
 </div>
 
@@ -84,17 +84,18 @@
             
             // Map status & roles to colors (The Signal System)
             const nodes = rawData.nodes.map(n => {
-                let color = '#475569'; // default low signal (grayish)
+                let color = '#334155'; // default low signal (slate-700)
                 
                 if (n.status === 'GREEN') color = '#22c55e';  // vibrant green
                 if (n.status === 'YELLOW') color = '#eab308'; // gold
-                if (n.status === 'CENTER') color = '#ffffff'; // white center
+                if (n.status === 'CENTER') color = '#38bdf8'; // sky blue center
                 
-                // Role-based stroke or pulse? Let's keep color for status, but role in stroke
+                // If it's a high subjective score, give it a glow or larger base
                 return {
                     ...n,
                     id: String(n.id),
-                    color: color
+                    color: color,
+                    size: Math.sqrt(n.score || 1) * 0.8 + 3
                 }
             });
 
@@ -157,22 +158,22 @@
                     const fontSize = 14/globalScale;
                     ctx.font = `${fontSize}px monospace`;
                     
-                    // Node radius - scaled down to prevent overlap
-                    const r = Math.sqrt(node.score || 1) * 0.8 + 2;
+                    const r = node.size;
                     
                     // Node Circle
                     ctx.beginPath();
                     ctx.arc(node.x, node.y, r, 0, 2 * Math.PI, false);
                     ctx.fillStyle = node.color;
+                    ctx.shadowColor = node.color;
+                    ctx.shadowBlur = node.status === 'GREEN' ? 10/globalScale : 0;
                     ctx.fill();
+                    ctx.shadowBlur = 0; // reset
                     
-                    // Selection/Role Indicator
-                    if (node.group === 'center' || node.role.includes('og')) {
+                    // Center/Curator Indicator
+                    if (node.status === 'CENTER' || node.role === 'whale') {
                         ctx.strokeStyle = '#ffffff';
-                        ctx.setLineDash(node.role.includes('og') ? [2, 2] : []); // Dash for OGs
-                        ctx.lineWidth = 1/globalScale;
+                        ctx.lineWidth = 1.5/globalScale;
                         ctx.stroke();
-                        ctx.setLineDash([]); // reset
                     }
 
                     // Text
@@ -191,16 +192,30 @@
                     }
                 });
 
-            // Physics Tuning - Stiffer for more stable clusters
+            // Physics Tuning - Radial Reputation Layout
+            const width = elem.clientWidth;
+            const height = elem.clientHeight;
+
             graph.d3Force('charge').strength(-150);
-            graph.d3Force('link').distance(l => 60 / Math.log1p(l.value || 1)); 
-            graph.d3Force('center', d3.forceCenter(elem.clientWidth / 2, elem.clientHeight / 2));
-            graph.d3Force('center').strength(0.1);
+            graph.d3Force('link').distance(40).strength(0.3); // Weaken links to allow radial rings
+            
+            // Remove standard center force - replace with radial
+            graph.d3Force('center', null);
+            
+            graph.d3Force('radial', d3.forceRadial(d => {
+                if (d.status === 'CENTER') return 0;
+                if (d.status === 'GREEN') return 180;
+                if (d.status === 'YELLOW') return 400;
+                return 650;
+            }, 0, 0).strength(0.8));
+
+            // Collision to prevent overlap in dense rings
+            graph.d3Force('collide', d3.forceCollide(n => n.size + 4));
 
             // Zoom to fit after a short delay to allow initial layout
             setTimeout(() => {
-                graph.zoomToFit(400, 50);
-            }, 500);
+                graph.zoomToFit(600, 100);
+            }, 800);
             
         } catch (e) {
             console.error(e);

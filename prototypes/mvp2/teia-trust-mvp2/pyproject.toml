@@ -6,11 +6,12 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "asyncpg",
-    "networkx",
+    "rustworkx==0.17.1",
     "pydantic",
     "python-dotenv",
     "scipy",
     "numpy",
+    "pytest",
 ]
 
 [tool.uv]

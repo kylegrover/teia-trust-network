@@ -1,7 +1,8 @@
 import asyncio
-import networkx as nx
 from database import get_index_conn, get_app_conn
 import time
+
+from trust_graph import TrustGraph
 
 async def init_score_table():
     async with get_app_conn() as conn:
@@ -16,45 +17,38 @@ async def init_score_table():
         """)
 
 class TrustEngine:
+    """High-level engine that delegates graph work to the rustworkx-backed TrustGraph."""
     def __init__(self):
-        self.G = nx.DiGraph()
+        # TrustGraph will raise if rustworkx is missing
+        self._gsvc = TrustGraph()
         self.global_scores = {}
         self.nodes_loaded = False
 
     async def load_graph(self):
-        print("📥 Fetching trust connections from indexer db...")
-        async with get_index_conn() as conn:
-            rows = await conn.fetch("SELECT source_id, target_id, trade_count FROM trust_connections")
-        
-        if not rows:
+        print("📥 Loading graph via TrustGraph (rustworkx)...")
+        await self._gsvc.load_from_index_db()
+        # TrustGraph maps node indices -> DB ids via rev_node_map
+        self.nodes_loaded = getattr(self._gsvc, "_nodes_loaded", False)
+        if not self.nodes_loaded:
             print("⚠️ No trust connections found.")
             return
 
-        print(f"🏗️ Building graph from {len(rows)} connections...")
-        self.G = nx.DiGraph()
-        for r in rows:
-            # We use log of trade count to dampen whale impact but keep signal
-            weight = 1.0 + (r['trade_count'] or 1)
-            self.G.add_edge(r['source_id'], r['target_id'], weight=weight)
-            
-        print(f"📊 Graph stats: {self.G.number_of_nodes()} nodes, {self.G.number_of_edges()} edges")
-        self.nodes_loaded = True
+        print(f"📊 Graph stats: {len(self._gsvc.node_map)} nodes, {len(list(self._gsvc.graph.weighted_edge_list()))} edges")
 
     def compute_global_pagerank(self):
-        print("🧠 Computing Global PageRank...")
-        self.global_scores = nx.pagerank(self.G, alpha=0.85, weight='weight')
-        return self.global_scores
+        print("🧠 Computing Global PageRank (rustworkx)...")
+        # returns mapping node_index -> score
+        node_scores = self._gsvc.compute_global_pagerank()
+        # map to DB ids
+        mapped = {self._gsvc.rev_node_map[n]: s for n, s in node_scores.items()}
+        self.global_scores = mapped
+        return mapped
 
     def compute_personalized_pagerank(self, seed_node_id: int):
-        if not self.nodes_loaded or seed_node_id not in self.G:
+        # TrustGraph.get_user_trust_vector already returns holder_id -> score
+        if not self.nodes_loaded:
             return {}
-        
-        print(f"🧠 Computing Personalized PageRank for seed {seed_node_id}...")
-        # PPR starts the random walk from the seed node 100% of the time
-        try:
-            return nx.pagerank(self.G, alpha=0.85, weight='weight', personalization={seed_node_id: 1.0})
-        except:
-            return {}
+        return self._gsvc.get_user_trust_vector(seed_node_id)
 
 async def run_trust_algorithm():
     print("🚀 Starting Trust Engine MVP2 (Isolated DB Mode)...")
@@ -100,4 +94,20 @@ async def run_trust_algorithm():
     print(f"✅ Trust Engine completed in {end_time - start_time:.2f} seconds.")
 
 if __name__ == "__main__":
-    asyncio.run(run_trust_algorithm())
+    # CLI: rustworkx-only (use uv to manage interpreter & deps)
+    import argparse, json
+
+    parser = argparse.ArgumentParser(description="Trust engine CLI (rustworkx)")
+    parser.add_argument("--ppr", type=int, help="Compute personalized PageRank for holder_id")
+    args = parser.parse_args()
+
+    if args.ppr is not None:
+        holder = args.ppr
+        async def run_ppr():
+            engine = TrustEngine()
+            await engine.load_graph()
+            vec = engine.compute_personalized_pagerank(holder)
+            print(json.dumps({"holder": holder, "ppr_top": sorted(vec.items(), key=lambda x: x[1], reverse=True)[:50]}, default=str))
+        asyncio.run(run_ppr())
+    else:
+        asyncio.run(run_trust_algorithm())
