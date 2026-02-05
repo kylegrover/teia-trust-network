@@ -36,6 +36,8 @@
     <label>Center:</label>
     <input type="text" id="centerNode" placeholder="tz... or id" value="">
     <button onclick="drawGraph()">Visualize Trust</button>
+    <button id="btnToggleLock" onclick="toggleLockLayout()" title="Lock positions to stop motion but keep hover/zoom">Settle layout</button>
+    <button id="btnTick" onclick="tickOnce()" title="Force a single render tick">Tick</button>
 </div>
 
 <div id="graph-container"></div>
@@ -66,6 +68,7 @@
     let hoverNode = null;
     const neighbors = new Set();
     const neighborLinks = new Set();
+    let simulationSettled = false; // true when layout has cooled but interactions remain active
 
     function closeModal() { document.getElementById('modal').style.display = 'none'; }
     function copyText(text) {
@@ -77,7 +80,45 @@
         });
     }
 
-    async function drawGraph() {
+    // --- Layout control helpers ---
+    function lockLayout() {
+        if (!graph || !graph.graphData) return;
+        // Freeze visible node positions so the layout no longer drifts or rotates
+        graph.graphData().nodes.forEach(n => { n.fx = n.x; n.fy = n.y; });
+        // Disable user dragging to avoid torque-induced rotation
+        if (typeof graph.enableNodeDrag === 'function') graph.enableNodeDrag(false);
+        // Ensure simulation alpha is low but allow one-off frames for hover
+        if (typeof graph.d3AlphaTarget === 'function') graph.d3AlphaTarget(0);
+        simulationSettled = true;
+        document.getElementById('btnToggleLock').innerText = 'Unlock layout';
+    }
+
+    function unlockLayout() {
+        if (!graph || !graph.graphData) return;
+        graph.graphData().nodes.forEach(n => { delete n.fx; delete n.fy; });
+        if (typeof graph.enableNodeDrag === 'function') graph.enableNodeDrag(true);
+        // nudge the sim so nodes can relax again
+        if (typeof graph.d3AlphaTarget === 'function') graph.d3AlphaTarget(0.2);
+        simulationSettled = false;
+        document.getElementById('btnToggleLock').innerText = 'Settle layout';
+    }
+
+    function toggleLockLayout() {
+        if (!graph) return;
+        if (simulationSettled) unlockLayout(); else lockLayout();
+    }
+
+    function tickOnce() {
+        if (!graph) return;
+        if (typeof graph.tickFrame === 'function') return graph.tickFrame();
+        // fallback: tiny alpha nudge
+        if (typeof graph.d3AlphaTarget === 'function') {
+            graph.d3AlphaTarget(0.01);
+            setTimeout(() => graph.d3AlphaTarget(0), 40);
+        }
+    }
+
+    async function drawGraph() { 
         const centerInput = document.getElementById('centerNode').value.trim();
         if(!centerInput) return alert("Please enter an address or ID");
 
@@ -139,7 +180,9 @@
 
             const elem = document.getElementById('graph-container');
             if (graph) {
-                graph.pauseAnimation();
+                // gently cool the previous simulation but keep interaction handlers active
+                if (typeof graph.d3AlphaTarget === 'function') graph.d3AlphaTarget(0);
+                simulationSettled = true;
                 elem.innerHTML = '';
             }
 
@@ -172,7 +215,6 @@
                     neighborLinks.clear();
                     if (node) {
                         hoverNode = node;
-                        // Use graphData().links to get the objects that force-graph has processed
                         graph.graphData().links.forEach(link => {
                             const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
                             const targetId = typeof link.target === 'object' ? link.target.id : link.target;
@@ -187,6 +229,14 @@
                         hoverNode = null;
                     }
                     elem.style.cursor = node ? 'pointer' : null;
+                    // Force a single render frame so hover highlights appear even after layout cooled.
+                    if (typeof graph.tickFrame === 'function') {
+                        graph.tickFrame();
+                    } else if (typeof graph.d3AlphaTarget === 'function') {
+                        // nudge the simulation so it produces one frame without fully resuming
+                        graph.d3AlphaTarget(0.01);
+                        setTimeout(() => graph.d3AlphaTarget(0), 60);
+                    }
                 })
                 .onNodeClick(node => {
                     const body = document.getElementById('modalBody');
@@ -256,25 +306,26 @@
                 });
 
             // Physics Tuning - Radial Reputation Layout
-            const width = elem.clientWidth;
-            const height = elem.clientHeight;
-
-            graph.d3Force('charge').strength(-200);
-            graph.d3Force('link').distance(50).strength(0.2); 
+            graph.d3Force('charge').strength(-220); // Slightly stronger push
+            graph.d3Force('link').distance(50).strength(0.05); // Very weak links to allow radial rings to form without torque
             
             // Remove standard center force - replace with radial
             graph.d3Force('center', null);
             
-            const RADIUS_1 = 300;
-            const RADIUS_2 = 600;
-            const RADIUS_3 = 1000;
+            const RADIUS_1 = 150;
+            const RADIUS_2 = 500;
+            const RADIUS_3 = 800;
 
             graph.d3Force('radial', d3.forceRadial(d => {
                 if (d.status === 'CENTER') return 0;
                 if (d.status === 'GREEN') return RADIUS_1;
                 if (d.status === 'YELLOW') return RADIUS_2;
                 return RADIUS_3;
-            }, 0, 0).strength(1.5)); 
+            }, 0, 0).strength(0.8)); // Lower strength reduces "rotation friction"
+
+            // ADDED: Anchor forces to prevent global rotation drift
+            graph.d3Force('x', d3.forceX().strength(0.01));
+            graph.d3Force('y', d3.forceY().strength(0.01));
 
             // Add background rings to the canvas
             graph.onRenderFramePre((ctx, scale) => {
@@ -308,11 +359,11 @@
             // Collision to prevent overlap in dense rings
             graph.d3Force('collide', d3.forceCollide(n => n.size + 6));
 
-            // Zoom to fit after a short delay to allow initial layout
+            // Zoom to fit after a short delay to allow initial layout — then pause for a static view
             setTimeout(() => {
                 graph.zoomToFit(600, 100);
-            }, 800);
-            
+                // Lock positions after the camera settles so we stop motion but keep pointer events
+                lockLayout();
         } catch (e) {
             console.error(e);
             alert("Error: " + e.message);
